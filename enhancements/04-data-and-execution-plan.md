@@ -109,11 +109,22 @@ measures the ruler changing, not the strategy.
   (doc 03 §3.9a/b), so drawdown and selection aren't understated. Do this in Phase A
   so every later comparison shares one honest ruler.
 - Wire **multi-seed evaluation** (3–5 seeds); report distributions.
-- **Pin the primary OOS metric + ship threshold** up front (e.g. median
-  stitched-OOS return/maxDD across sliding folds over 5 seeds — doc 03 §7).
-- **Re-form the gate for fold count** (doc 05 N3): fraction-based breadth +
-  quantile floor instead of absolute counts (written for 5 folds, meaningless at
-  ~34). Pin the new parameters **before** seeing any baseline result.
+- **PINNED metric + ship threshold (RATIFIED 2026-07-01).** Primary = median-of-5
+  of (stitched-OOS return ÷ |stitched-OOS max MTM DD|); ALSO report a path-based
+  DD (Ulcer / return-over-avg-DD) as a non-gating secondary; ship rule = ≥+10%
+  relative AND ≥4/5 seeds beat running-best median AND no gate regression;
+  3 seeds rank / 5 finalists. The +10% margin is PROVISIONAL — reserve ONE
+  recalibration against the baseline's measured seed-IQR, once, before any
+  Phase-C A/B (calibrating to noise, not outcome). Implemented: `sharpe_trade`,
+  `max_drawdown_mtm_pct`, `ulcer_index_mtm` in `evaluate.py`; harness in
+  `eval_harness.py`.
+- **PINNED gate re-form (doc 05 N3, RATIFIED 2026-07-01).** Fraction/quantile
+  form, fold-count-invariant: breadth `min_consistent_fold_frac = 0.70`
+  (return>0 AND PF>1; ceil(0.70×5)=4 reproduces the old block-scheme 4-of-5),
+  floor = 10th-percentile fold PF ≥ 0.90, third leg = mean **trade-based**
+  Sharpe > 0. Pinned by reasoning before any baseline existed. Gate: a sound
+  gate rejecting the baseline is a RESULT, not a trigger to loosen; re-pin only
+  for mechanical mis-specification, never to make a result pass.
 - **Decide the fill-model fix** (doc 05 N1, gap-through-SL — measured at ~monthly
   >1×ATR gaps): recommended to land HERE so the baseline is measured under honest
   fills; deferring it to Phase C keeps a known-flattering anchor.

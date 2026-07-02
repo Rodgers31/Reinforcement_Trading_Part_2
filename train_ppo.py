@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import sys
 from copy import deepcopy
@@ -674,15 +675,25 @@ def _passes_consistency_gate(
     summary: pd.DataFrame,
     ret_col: str = "val_return_pct",
     pf_col: str = "val_profit_factor",
-    sharpe_col: str = "val_sharpe",
+    sharpe_col: str = "val_sharpe_trade",
 ) -> tuple[bool, list[str]]:
     """Decide whether the walk-forward folds are consistent enough to deploy.
 
     A strategy that only works on some folds has no robust edge, so the gate
-    requires breadth (enough folds genuinely profitable), a floor (no single
-    fold catastrophic), and a positive mean risk-adjusted result.  Thresholds
-    live in config.py.  Pass ret_col/pf_col/sharpe_col="test_*" to gate on the
-    true out-of-sample test windows (sliding walk-forward) instead of val.
+    requires breadth (a FRACTION of folds genuinely profitable), a floor (the
+    low-quantile fold PF must not be catastrophic), and a positive mean
+    trade-based Sharpe.  Fraction/quantile form (doc 05 N3, ratified
+    2026-07-01) keeps the gate's meaning invariant to fold count: the old
+    absolute counts were written for the 5-fold block scheme and silently
+    changed meaning at the sliding default's ~34 folds.  ceil(0.70×5)=4
+    reproduces the old 4-of-5 breadth exactly at n=5.
+
+    DISCIPLINE: a sound gate rejecting the baseline is a RESULT, not a trigger
+    to loosen; re-pin only for mechanical mis-specification, never to make a
+    result pass.
+
+    Thresholds live in config.py.  Pass ret_col/pf_col/sharpe_col="test_*" to
+    gate on the true out-of-sample test windows (sliding walk-forward).
     """
     n = len(summary)
     ret = summary[ret_col]
@@ -690,23 +701,24 @@ def _passes_consistency_gate(
     sharpe = summary[sharpe_col]
 
     good = int(((ret > 0) & (pf > CFG.gate_min_profit_factor)).sum())
-    worst_pf = float(pf.min())          # NaN folds (no trades) skipped by .min()
+    need_good = int(math.ceil(CFG.min_consistent_fold_frac * n))
+    pf_floor = float(pf.quantile(CFG.gate_pf_floor_quantile))  # NaN folds skipped
     mean_sharpe = float(sharpe.mean())
 
-    c_count = good >= CFG.min_consistent_folds
-    c_worst = worst_pf >= CFG.gate_worst_fold_min_pf
+    c_count = good >= need_good
+    c_floor = pf_floor >= CFG.gate_pf_floor_value
     c_sharpe = (mean_sharpe > 0) if CFG.gate_require_mean_sharpe_positive else True
-    passed = bool(c_count and c_worst and c_sharpe)
+    passed = bool(c_count and c_floor and c_sharpe)
 
     ok = lambda b: "OK  " if b else "FAIL"
     detail = [
         f"[{ok(c_count)}] folds with return>0 & PF>{CFG.gate_min_profit_factor:g}: "
-        f"{good}/{n}  (need >= {CFG.min_consistent_folds})",
-        f"[{ok(c_worst)}] worst-fold val PF: {worst_pf:.2f}  "
-        f"(need >= {CFG.gate_worst_fold_min_pf:g})",
+        f"{good}/{n}  (need >= {need_good} = ceil({CFG.min_consistent_fold_frac:.0%} of {n}))",
+        f"[{ok(c_floor)}] {CFG.gate_pf_floor_quantile:.0%}-quantile fold PF: {pf_floor:.2f}  "
+        f"(need >= {CFG.gate_pf_floor_value:g})",
     ]
     if CFG.gate_require_mean_sharpe_positive:
-        detail.append(f"[{ok(c_sharpe)}] mean val Sharpe: {mean_sharpe:+.2f}  (need > 0)")
+        detail.append(f"[{ok(c_sharpe)}] mean trade-Sharpe: {mean_sharpe:+.2f}  (need > 0)")
     return passed, detail
 
 
@@ -1091,7 +1103,7 @@ def train_sliding_walk_forward(
     # ── Deployment gate on the TEST windows ──────────────────────────────────
     passed, detail = _passes_consistency_gate(
         summary, ret_col="test_return_pct",
-        pf_col="test_profit_factor", sharpe_col="test_sharpe")
+        pf_col="test_profit_factor", sharpe_col="test_sharpe_trade")
     print("\n  Consistency gate (on test windows):")
     for line in detail:
         print(f"    {line}")

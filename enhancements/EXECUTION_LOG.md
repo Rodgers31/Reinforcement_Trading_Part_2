@@ -306,3 +306,49 @@ carve (4 commits). PROPOSED, NOT IMPLEMENTED (pin-by-reasoning rule):
   sign-off.
 Phase B (baseline) remains blocked on the 0b Dukascopy backbone + these pins.
 
+---
+
+## Task 4a — N3 gate landed + both pins RATIFIED  ✅ (2026-07-01) — PHASE A CLOSED
+
+Reviewer ratified both proposals (with adjustments: trade-based Sharpe as the
+gate's third leg; a path-based DD secondary added to the metric; the +10%
+margin marked provisional with exactly one noise-calibrated adjustment).
+
+**Gate (implemented, `config.py` + `train_ppo.py`):** breadth
+`min_consistent_fold_frac = 0.70` (return>0 AND PF>1; `ceil(0.70×5)=4`
+reproduces the old block-scheme 4-of-5), floor = 10th-percentile fold PF ≥
+0.90, third leg = mean **trade-based** Sharpe > 0 (`val/test_sharpe_trade`).
+Old absolute knobs (`min_consistent_folds`, `gate_worst_fold_min_pf`) removed;
+grep confirms no stale references. Stale D2 comment in the config block fixed
+in passing (it claimed `run_info.NO_DEPLOY.json`; reality = `NO_DEPLOY.txt` +
+`gate_passed`).
+> **Discipline (verbatim):** a sound gate rejecting the baseline is a RESULT,
+> not a trigger to loosen; re-pin only for mechanical mis-specification, never
+> to make a result pass.
+
+**Metric (recorded; supporting metrics implemented):** primary = median-of-5 of
+(stitched-OOS return ÷ |stitched-OOS max MTM DD|); ALSO report a path-based DD
+(Ulcer / return-over-avg-DD) as a non-gating secondary — implemented as
+`ulcer_index_mtm` in `evaluate.py`; ship rule = ≥+10% relative AND ≥4/5 seeds
+beat running-best median AND no gate regression; 3 seeds rank / 5 finalists.
+The +10% margin is PROVISIONAL — reserve ONE recalibration against the
+baseline's measured seed-IQR, once, before any Phase-C A/B (calibrating to
+noise, not outcome).
+
+**Verification (`checks/check_n3_gate_reform.py`) — ALL PASS:**
+- n=5: 4-of-5 passes / 3-of-5 fails (old breadth reproduced exactly); one
+  catastrophic fold (PF 0.5) fails the floor; negative mean trade-Sharpe fails.
+  Documented divergence: worst-fold PF 0.85 now PASSES the floor (q10 blends to
+  0.97) where the old worst-fold rule failed — accepted when ratifying the
+  quantile form (smoothing at tiny n).
+- n=34: breadth needs 24 (was: 4, trivial); floor tolerates 3 catastrophic
+  folds and rejects 4 (was: one bad fold vetoed all 34); NaN (no-trade) folds
+  skipped, not zero-treated.
+- Ulcer arithmetic exact (flat→0; [100,90,100]→√(100/3)%).
+
+**PHASE A COMPLETE.** The ruler: honest gate honored downstream (B1), honest
+pairing (B2/B3), honest fills (N1), honest risk (MTM DD + trade-Sharpe +
+Ulcer), fold-count-invariant gate (N3), multi-seed harness, lockbox mechanism,
+and both pins recorded. Next: 0b Dukascopy backbone (critical path) → Phase B
+baseline under this ruler.
+

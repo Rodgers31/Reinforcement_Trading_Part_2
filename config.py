@@ -121,16 +121,32 @@ class ProjectConfig:
     # Format "YYYY-MM-DD" (naive dates are localized to the data's timezone).
     lockbox_start_date: Optional[str] = None
 
-    # ── Walk-forward deployment gate ─────────────────────────────────────────
+    # ── Walk-forward deployment gate (re-formed 2026-07-01, doc 05 N3) ───────
     # After the folds finish, the final fold is promoted to the production slot
-    # (models/) ONLY if the out-of-sample folds are consistently good. Otherwise
-    # nothing ships: the artifacts stay quarantined under models/walk_forward/
-    # and any stale models/run_info.json is set aside as run_info.NO_DEPLOY.json.
-    # The gate only ever PREVENTS a bad deploy — it never fabricates one.
-    min_consistent_folds: int = 4              # folds needing return>0 AND PF>gate_min_profit_factor
-    gate_min_profit_factor: float = 1.0        # a fold "passes" when its val PF exceeds this
-    gate_worst_fold_min_pf: float = 0.9        # AND no single fold's val PF may fall below this
-    gate_require_mean_sharpe_positive: bool = True  # AND mean val Sharpe across folds must be > 0
+    # (models/) with run_info["gate_passed"] recording the verdict; on failure a
+    # NO_DEPLOY.txt marker is written and downstream tools refuse to use the
+    # model without an explicit --allow-failed-gate override (doc 01 B1).
+    #
+    # Thresholds are FRACTION/QUANTILE-based so the gate's meaning is invariant
+    # to fold count — the old absolute counts (4 folds; worst-fold PF ≥ 0.9)
+    # were written for the 5-fold block scheme and silently changed meaning at
+    # the sliding default's ~34 folds (breadth became trivial, floor draconian).
+    #
+    # RATIFIED 2026-07-01, pinned by reasoning BEFORE any baseline existed:
+    #   breadth ≥ 70% of folds with return>0 AND PF>gate_min_profit_factor
+    #           (ceil(0.70×5)=4 reproduces the old 4-of-5 at n=5; luck-pass
+    #            probability under a no-edge null at n=34 ≈ 0.8%)
+    #   floor   10th-percentile fold PF ≥ 0.90 (≈ old worst-of-5 semantics at
+    #           n=5; tolerates isolated bad regimes, rejects fat left tails)
+    #   third   mean TRADE-BASED Sharpe > 0 (honest per-trade unit, doc 03 §3.9b)
+    # DISCIPLINE: a sound gate rejecting the baseline is a RESULT, not a trigger
+    # to loosen; re-pin only for mechanical mis-specification, never to make a
+    # result pass.
+    min_consistent_fold_frac: float = 0.70     # breadth: fraction of folds needing return>0 AND PF>gate_min_profit_factor
+    gate_min_profit_factor: float = 1.0        # a fold "passes" when its PF exceeds this
+    gate_pf_floor_quantile: float = 0.10       # the PF floor applies at this quantile across folds
+    gate_pf_floor_value: float = 0.90          # ... and that quantile must be >= this
+    gate_require_mean_sharpe_positive: bool = True  # AND mean trade-Sharpe across folds must be > 0
 
     # Embargo removes bars on each side of every split boundary.
     # EMA-200 (the longest lookback used) retains ~37% of a bar's weight after

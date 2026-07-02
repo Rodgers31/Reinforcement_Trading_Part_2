@@ -9,6 +9,19 @@ def drawdown(equity: pd.Series) -> pd.Series:
     return equity / peak - 1.0
 
 
+def ulcer_index(equity: pd.Series) -> float:
+    """Path-based drawdown severity: RMS of percentage drawdown over the path.
+
+    Non-gating SECONDARY metric (metric pin, ratified 2026-07-01): max-DD sees
+    only the single worst valley; the Ulcer index prices how long and how deep
+    the curve spends underwater. Reported alongside, never gating.
+    """
+    if equity is None or len(equity) == 0:
+        return float("nan")
+    dd_pct = drawdown(equity.astype(float)) * 100.0
+    return float(np.sqrt(np.mean(np.square(dd_pct))))
+
+
 def summarize_equity(equity_df: pd.DataFrame, initial_equity: float = 10_000.0,
                      periods_per_year: int = 252 * 24 * 12) -> dict:
     """
@@ -48,8 +61,10 @@ def summarize_equity(equity_df: pd.DataFrame, initial_equity: float = 10_000.0,
     # Mark-to-market drawdown (doc 03 §3.9a): includes open-position unrealized
     # PnL, so intra-trade pain is measured — realized-only DD understates it.
     max_dd_mtm = np.nan
+    ulcer_mtm = np.nan
     if "equity_mtm" in equity_df.columns:
         max_dd_mtm = drawdown(equity_df["equity_mtm"].astype(float)).min()
+        ulcer_mtm = ulcer_index(equity_df["equity_mtm"])
 
     return {
         "initial_equity": initial_equity,
@@ -58,6 +73,7 @@ def summarize_equity(equity_df: pd.DataFrame, initial_equity: float = 10_000.0,
         "annualized_return_pct": float(ann_return * 100) if np.isfinite(ann_return) else np.nan,
         "max_drawdown_pct": float(max_dd * 100),
         "max_drawdown_mtm_pct": float(max_dd_mtm * 100) if np.isfinite(max_dd_mtm) else np.nan,
+        "ulcer_index_mtm": float(ulcer_mtm) if np.isfinite(ulcer_mtm) else np.nan,
         "sharpe_like": float(sharpe) if np.isfinite(sharpe) else np.nan,
         "sortino_ratio": float(sortino) if np.isfinite(sortino) else np.nan,
         "calmar_ratio": float(calmar) if np.isfinite(calmar) else np.nan,
