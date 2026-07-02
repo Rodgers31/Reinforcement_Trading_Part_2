@@ -9,7 +9,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from baselines import TrendHoldPolicyParams, evaluate_policy, make_trend_hold_policy
 from config import CFG
 from evaluate import full_report
-from model_artifacts import load_run_info, resolve_project_path, resolve_sb3_model_path
+from model_artifacts import check_gate_approval, load_run_info, resolve_project_path, resolve_sb3_model_path
 from train_ppo import _CaptureDoneWrapper, _slice_m1_for_decision_window, build_env, load_datasets
 
 
@@ -74,13 +74,16 @@ def _run_rl_holdout(
     return equity, trades, report
 
 
-def main(out_dir: str = "outputs/final_holdout") -> None:
+def main(out_dir: str = "outputs/final_holdout", allow_failed_gate: bool = False) -> None:
     print("Revealing the sealed test split and writing holdout-only artifacts.")
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
     _, run_info = load_run_info("models")
+    # B1 fix: honor the deployment gate BEFORE revealing the sealed holdout.
+    check_gate_approval(run_info, allow_failed=allow_failed_gate,
+                        context="the one-time sealed-holdout reveal")
     model_path = resolve_sb3_model_path(run_info["model_path"], ".")
     vecnorm_path = resolve_project_path(run_info["vecnorm_path"], ".")
     best_model_path = Path("models/best_model/best_model.zip")
@@ -131,4 +134,12 @@ def main(out_dir: str = "outputs/final_holdout") -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="One-time sealed-holdout evaluation.")
+    parser.add_argument("--out-dir", default="outputs/final_holdout")
+    parser.add_argument("--allow-failed-gate", action="store_true",
+                        help="Explicitly evaluate a model whose walk-forward gate "
+                             "FAILED (results are not deployable).")
+    args = parser.parse_args()
+    main(out_dir=args.out_dir, allow_failed_gate=args.allow_failed_gate)

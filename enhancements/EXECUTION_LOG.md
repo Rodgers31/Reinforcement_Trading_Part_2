@@ -103,3 +103,38 @@ index/status refreshed (env note was stale — stack now runs).
 **Plan impact:** none to ordering — Task 2 (B1–B3) unchanged. Two new open
 decisions added to doc 04 §5 (N1 sequencing; P9 calendar source).
 
+---
+
+## Task 2a — B1 fix: the deploy gate now gates  ✅ (2026-07-01)
+
+**Re-verified against live source before editing:** `_finalize_deployment` always
+promotes and records `gate_passed` (`train_ppo.py:747,751-755`); grep confirmed
+**zero readers** of the flag in `final_holdout_eval.py`, `training_diagnostics.py`,
+or the notebooks. `test_analysis.ipynb`'s stored outputs even show a real
+`gate_passed: False` run analyzed silently (Test +70% reported for a non-approved
+model) — the bug had already bitten in production use.
+
+**Fix (blocked-by-default, explicit override — never silent either way):**
+- `model_artifacts.py` — new `check_gate_approval()` shared guard: key absent
+  (no gate ran, e.g. single-split) → proceed; `true` → proceed; `false` → loud
+  banner + `SystemExit(2)`, unless explicitly overridden → proceed with loud
+  warning.
+- `final_holdout_eval.py` — guard fires immediately after `load_run_info`,
+  BEFORE the sealed holdout is revealed; new `--allow-failed-gate` CLI flag.
+- `training_diagnostics.py` — guard at the production-model load in section [3];
+  new `allow_failed_gate` param + `--allow-failed-gate` CLI flag (SystemExit
+  propagates past the section's `except (FileNotFoundError, KeyError)`).
+- `notebooks/test_analysis.ipynb` (cell `853a550e`) — `ALLOW_FAILED_GATE = False`
+  constant + `RuntimeError` guard right after `run_info` load.
+
+**Repro (`checks/check_b1_gate_guard.py`) — ALL PASS:** unit semantics (4 cases);
+end-to-end: fabricated `gate_passed:false` run_info against `models/smoke/`
+fixtures → `final_holdout_eval.py` exits 2 with BLOCKED banner; with
+`--allow-failed-gate` it warns loudly and proceeds past the guard (then stops at
+the absent default CSV — a different failure, proving the guard released).
+Fixture auto-removed; refuses to overwrite a real `models/run_info.json`.
+
+**Measurement-only:** touches only reporting/eval surfaces; no training code
+path. On the default sliding path, behavior changes only when a run's gate
+FAILED — which is the fix, not a regression. Trained weights unaffected.
+
