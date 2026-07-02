@@ -352,3 +352,52 @@ Ulcer), fold-count-invariant gate (N3), multi-seed harness, lockbox mechanism,
 and both pins recorded. Next: 0b Dukascopy backbone (critical path) → Phase B
 baseline under this ruler.
 
+---
+
+## Task 5 — 0b Dukascopy backbone acquired + validated  ✅ (2026-07-02)
+
+**Deliverable:** `data/XAUUSD_M1_Bid_Dukascopy_2003.05.05_2026.07.02.csv` —
+**7,851,188 M1 rows, 23.2 years, 574 MB, BID** (repo's RL-default stream;
+gitignored, as are the per-year raw chunks in `data/dukascopy_raw/`).
+
+**How:** `dukascopy-node` (Node 22; validated first on one week vs OANDA before
+the full pull), resumable per-year chunks with cache+retries. Two per-year
+artifacts came down PARTIAL on the first pass (2014 truncated at Jan-10, 2018
+at Jan-19 — non-empty files that would have silently passed a size-only check;
+caught by a full per-chunk coverage sweep) and two years initially failed
+outright; direct CDN probes proved the server HAS all 2014–2015 days (HTTP 200
+each), so the failures were client/CDN throttling — resolved with patient
+retries + `--no-fail-after-retries` + smaller batches. Final sweep: all 24 bid
++ 4 ask chunks healthy, ~310 trading days/yr, no non-calendar gaps.
+
+**Conversion:** `convert_dukascopy_to_lean.py` (committed) — epoch-ms UTC →
+LEAN convention (`DateTime,Open,High,Low,Close,Volume`, UTC, bar-open), 0
+duplicate timestamps. Drops into the loader with `time_col="DateTime"`,
+`source_tz="UTC"`, `timestamp_is_bar_open=True`.
+
+**Validation (`checks/check_backbone_data.py`, committed) — ALL HARD GATES PASS:**
+1. **Splice vs OANDA** (2023-01-02→2026-06-11, n=1,213,082 common bars):
+   Dukascopy-mid vs OANDA-mid median |diff| = **0.025** (median spread 0.410 —
+   16× inside), systematic offset **+0.0000**, p99 = 0.257. Like-for-like,
+   agree well within spread → stitching approved.
+2. **Timezone/alignment:** lag-sweep minimum at lag 0 (0.025 vs ~2.5–3.5 at
+   ±60/120min) — no DST/offset bug.
+3. **N6 volume comparability: REJECT.** Full-window Spearman = **0.694** <
+   0.70 pre-set bar (a one-week sample read 0.865 — flattering; the full
+   window is the honest number). **Verdict: volume features are REJECTED —
+   nothing downstream may use cross-vendor Volume as a feature (doc 05 N6).**
+4. **Loads + leakage:** full backbone → 139,611 H1 bars → **25 features,
+   0 NaN/0 inf**; `leakage_checks` guardrail PASS.
+5. **Census:** 2003 sparse (197 days, ~40% density), 2004–2005 ramping,
+   **2006→2026 fully dense** (333–365k bars/yr, 309–313 days/yr, longest gaps
+   = weekend/holiday only). **Recommended clean start: 2006-01-01 → 20.5
+   dense years → ~28–30 sliding folds** (2003–2005 kept in the file but
+   flagged density-degraded; sparse M1 mainly coarsens fill detection, which
+   SL-first renders more pessimistic, not less).
+
+**DoD (doc 04 §1.4): MET** — ≥15y ✓ (20.5y dense / 23.2y total), loads through
+`prepare_feature_frame` ✓, passes `leakage_checks.py` ✓, splice within spread ✓,
+N6 verdict recorded ✓. Phase B is now unblocked on data; config still points at
+the old default CSV — switching `csv_path` (+ pinning the lockbox date) belongs
+to the Phase-B runner, not this chunk.
+
