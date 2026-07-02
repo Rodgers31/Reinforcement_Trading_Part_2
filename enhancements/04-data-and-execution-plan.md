@@ -73,7 +73,9 @@ low-risk, but verify it (step 3).
 2. Convert to loader format (O/H/L/C/V + the three settings above); land in `data/`.
 3. **Splice-check** against the OANDA overlap you already have (2023-2026): compare
    Dukascopy vs OANDA on the shared window — they must agree to within spread before
-   stitching. Verify, don't assume.
+   stitching. Verify, don't assume. Include **volume comparability** in the same
+   check (doc 05 N6): if vendor tick volumes don't reconcile, volume features are
+   rejected permanently rather than silently unreliable.
 4. Keep OANDA (your bot) for the recent tail + per-instrument spread calibration +
    eventual live parity.
 
@@ -109,6 +111,12 @@ measures the ruler changing, not the strategy.
 - Wire **multi-seed evaluation** (3–5 seeds); report distributions.
 - **Pin the primary OOS metric + ship threshold** up front (e.g. median
   stitched-OOS return/maxDD across sliding folds over 5 seeds — doc 03 §7).
+- **Re-form the gate for fold count** (doc 05 N3): fraction-based breadth +
+  quantile floor instead of absolute counts (written for 5 folds, meaningless at
+  ~34). Pin the new parameters **before** seeing any baseline result.
+- **Decide the fill-model fix** (doc 05 N1, gap-through-SL — measured at ~monthly
+  >1×ATR gaps): recommended to land HERE so the baseline is measured under honest
+  fills; deferring it to Phase C keeps a known-flattering anchor.
 - **Carve the final lockbox** — a tail period excluded from the *entire* sweep (a
   walk-forward over all history leaves nothing untouched unless carved out now).
 - **DoD:** a reproducible harness that, given a model, returns a multi-seed OOS
@@ -116,13 +124,19 @@ measures the ruler changing, not the strategy.
 
 ### Phase B — Baseline
 - Current strategy **as-is** (no enhancements), multi-seed, on the dev-OOS surface,
-  under the honest ruler. This is the anchor every change is measured against.
+  under the honest ruler (including the N1 fill model, if adopted in Phase A). This
+  is the anchor every change is measured against.
 - Optional: run the pre-fix "uncalibrated" numbers once and file them clearly
   labeled — for the record, not as the anchor.
 - **DoD:** a logged baseline distribution + the pinned metric value.
 
 ### Phase C — Enhancements, one at a time
 - Order per **doc 03 §6** (quick wins → high-leverage bets → research long-shots).
+- Doc-05 additions queue here: the **N2+N4 env-correctness bundle** (zero-obs
+  truncation bootstrap + terminated/truncated semantics, one attribution run);
+  **representation batches** per doc 05 §2.5 (P1 range-position + P4 gap-awareness →
+  P3 M1-microstructure → P2 observable cost, N6 volume if its data gate passes);
+  the **P5 retrain-cadence sweep** once warm-start makes it affordable.
 - Each substantive change: multi-seed, A/B vs the **running best**, ship/kill on the
   pre-committed threshold, one row in the decision log. Trivial hygiene may bundle;
   load-bearing changes go solo (attribution).
@@ -133,6 +147,10 @@ measures the ruler changing, not the strategy.
 ### Phase D — Multi-instrument
 - Follow **doc 02** phasing (Phase 0 similarity diagnostic → per-pair specialists →
   pooled generalist + instrument tag → portfolio).
+- Deployment design gains the **portfolio risk overlay** (doc 05 N7: aggregate-DD
+  kill-switch, per-currency net-exposure caps, max concurrent books); config gains
+  per-instrument `bars_per_year` (doc 05 N8); the VecNormalize **norm-mask**
+  (doc 05 P7) is built once, together with the instrument tag.
 - Yardstick **shifts**: not "better than gold-only on gold," but "does the
   portfolio's risk-adjusted return beat the single-instrument books."
 - **DoD:** doc-02 go/no-go experiment resolved on the dev surface.
@@ -163,6 +181,9 @@ visible which changes actually earned their place.
 - Execution timeframe: **M1** (needs deep M1) or **M5** fallback?
 - Seeds per variant (drives compute): 3 or 5?
 - Phase-D universe: which pairs, how many?
+- N1 sequencing (doc 05): honest gap-fills before the baseline (recommended), or an
+  attributed Phase-C A/B?
+- Economic-calendar source for P9 (doc 05): acquire during the data work, or drop?
 
 ## 6. Next action
 

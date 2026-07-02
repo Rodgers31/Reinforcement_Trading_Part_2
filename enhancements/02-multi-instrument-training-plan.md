@@ -184,7 +184,7 @@ fancier thing can't beat the simple thing OOS, it added nothing.
 
 | File | Change | Effort |
 |---|---|---|
-| `config.py` | `csv_path` (single) → a list of instrument specs, each with its own `spread`/`slippage`/`commission` (ideally in ATR/pip terms). `config.py:39`, `config.py:143-145` | small |
+| `config.py` | `csv_path` (single) → a list of instrument specs, each with its own `spread`/`slippage`/`commission` (ideally in ATR/pip terms) **and its own `bars_per_year`** (doc 05 N8 — `config.py:20-31` is gold-specific). Cost should also become *observable* to the agent (doc 05 P2), routed through the same VecNormalize bypass as the tag (doc 05 P7). `config.py:39`, `config.py:143-145` | small |
 | `data_loader.py` | load/resample N CSVs keyed by instrument; MT4 parsing/tz logic reused as-is | small |
 | `features.py` | **reusable almost unchanged** (the big win). Add an instrument-ID feature; ideally have the ID **bypass VecNormalize** (or be a learned embedding) so a one-hot isn't distorted by running-mean normalization | small |
 | `env_bracket.py` | biggest change: hold `{instrument: (decision_df, m1_df, cost)}`; `reset()` picks instrument + window; per-instrument cost flows into `_entry_price`/`_exit_price` (`env_bracket.py:156-161`) | medium |
@@ -211,6 +211,11 @@ fancier thing can't beat the simple thing OOS, it added nothing.
 7. **Fix B1–B3 first (doc 01).** Multi-instrument multiplies the number of
    models/gates/vecnorm pairings; shipping the current gate/vecnorm bugs into an
    N-instrument pipeline multiplies the blast radius.
+8. **The portfolio needs a risk overlay (doc 05 N7).** "Independent books" stack
+   correlated exposure — six USD-quoted books at 0.5% risk each can become one ~3%
+   USD bet in a risk-off move. The deployment design must include an aggregate
+   max-drawdown kill-switch, per-currency net-exposure caps, and a
+   max-concurrent-books limit.
 
 ---
 
