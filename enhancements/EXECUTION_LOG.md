@@ -40,3 +40,66 @@ is not yet version-controlled. `.venv/` is now also untracked (must be git-ignor
 **1,216,345** M1 rows (LEAN format `DateTime,Open,High,Low,Close,Volume`, UTC, mid).
 
 **Checkpoint:** awaiting user OK on the branch/commit proposal before any code change.
+**Resolved:** user approved; branch `execution/phase-a` created, commit `e6bc8ad`
+(plan docs + EXECUTION_LOG + `.gitignore`). `.venv/` confirmed untracked.
+
+---
+
+## Task 1 — Phase 0a smoke-test on real data  ✅ (2026-07-01)
+
+**Goal:** prove the single-split pipeline trains end-to-end on data we already have —
+**plumbing only, performance NOT interpreted** (doc 04 §6 track 0a).
+
+**How:** `smoke_test.py` uses runtime `CFG` overrides and leaves `config.py` untouched
+— a deliberate, reversible deviation from "edit config.py" so no smoke settings leak
+into the committed baseline. Data copied to `data/XAU_USD_M1.csv` (gitignored).
+Settings: `time_col="DateTime"`, `source_tz="UTC"`, `timestamp_is_bar_open=True`,
+`max_days_for_demo=365`, exec=1min / decision=H1 (defaults). Ran
+`train_ppo.train(total_timesteps=5000, train_episode_steps=1024, eval_freq=2000,
+n_envs=1, device="cpu", out_dir="models/smoke", reveal_test=False)`.
+
+**Result — PASS (exit 0; no errors, no deprecation/API-drift warnings):**
+- Data: M1 **353,495** rows [2025-06-11 → 2026-06-11], UTC → resampled to
+  **5,666 H1** feature bars [2025-06-26 → 2026-06-11].
+- Features: **25** exactly, **0 NaN / 0 inf** — matches the documented set.
+- PPO trained (5,120 steps, ~1,600 fps); VecNormalize + consistency callback ran;
+  **best checkpoint saved at 2,000 steps** (eligible: train_r +4.05 / val_r +2.54);
+  `run_info.json` correctly pairs the best model ↔ `best_model_vecnorm.pkl`.
+- Post-training eval produced train/val trade logs + an equity HTML; test kept sealed.
+- Artifacts in `models/smoke/` (gitignored): model `.zip`, vecnorm `.pkl`, equity
+  `.html`, `run_info.json`, `eval_logs/consistency_evals.csv`, `best_model/`.
+
+**Performance NOT interpreted** — 5k steps is untrained; the −7.7% train / +0.7% val
+returns are noise, recorded only to prove the eval path runs.
+
+**Version watch-item RESOLVED:** repo code runs unmodified on gymnasium 1.1.1 /
+sb3 2.7.1 / numpy 2.0.2 / torch 2.8.0 — no API drift.
+
+**Incidental (doc 01, NOT fixed — Task 2 scope):** the duplicate + mojibake post-eval
+print (B5) reproduced verbatim. B1–B3 untouched.
+
+**New deliverable (uncommitted, pending OK):** `smoke_test.py`.
+
+---
+
+## Interlude — skeptical re-review + doc 05 addendum  ✅ (2026-07-01, no code changes)
+
+Between Task 1 and Task 2 the user requested an adversarial review of the whole
+plan + code. Every doc-01 claim was re-verified against live source (B1/B2/B3
+confirmed; B3 found narrower than documented — `final_holdout_eval.py:92-95` pairs
+correctly, the mismatch is notebook-only). The installed SB3 2.7.1 was traced for
+env-dependent behavior, and a **gap census** ran on the real LEAN CSV (pure pandas):
+183 weekend reopens in 3.5y, median gap 0.33×ATR(H1), 90th pct 1.35×ATR, max
+4.3×ATR; 44 gaps > 1×ATR total.
+
+**Output:** `05-review-addendum-and-perception-audit.md` — missed items N1–N8
+(headline: N1 gap-through-SL fills; N2 zero-obs truncation bootstrap verified in
+SB3 source; N3 gate doesn't scale to ~34 folds; N7 portfolio risk overlay) plus a
+perception/learning-flow audit yielding feature candidates P1–P9 (range position,
+observable cost, M1 microstructure, gap awareness, retrain-cadence sweep) with a
+batch discipline. Items merged into doc 04's phases (05 §4), doc 02 §8–§9, README
+index/status refreshed (env note was stale — stack now runs).
+
+**Plan impact:** none to ordering — Task 2 (B1–B3) unchanged. Two new open
+decisions added to doc 04 §5 (N1 sequencing; P9 calendar source).
+
