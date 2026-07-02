@@ -165,8 +165,24 @@ class ProjectConfig:
     # Backtest/account model.
     initial_equity: float = 10_000.0
     risk_fraction: float = 0.005  # 0.5% equity risked per trade.
-    spread_price: float = 0.20    # XAUUSD price units; adjust to your broker.
-    slippage_price: float = 0.02  # XAUUSD price units per side.
+
+    # ── ATR-relative execution cost (2026-07-02, honest-anchor fix) ──────────
+    # Round-trip cost scales with the trade's ENTRY-bar ATR instead of a fixed
+    # absolute price. Why: a fixed 0.20 charged 7.7% of ATR in 2006 but 0.9%
+    # in 2026 (8x regime distortion), and at the REAL measured recent spread
+    # (0.41) it undercharged the recent era ~2x. ATR-relative keeps cost
+    # dimensionless (matches features/reward/brackets and the doc-02/05
+    # multi-instrument direction) and makes cost-per-R depend only on the SL
+    # bucket, never the regime: at SL=1.0xATR a 1R TP nets a constant
+    # 1 - (spread_frac/2 + slip_frac) = 0.9659R.
+    # PINNED BY MEASUREMENT (never tuned to a result):
+    #   spread_atr_frac   = 0.41 / 6.586 = 0.0623
+    #     0.41  = median OANDA XAUUSD spread over 2023-2026 (0b splice census)
+    #     6.586 = median H1 ATR(14) over the SAME 2023-2026 window (backbone)
+    #   slippage_atr_frac = 0.02 / 6.586 = 0.0030 (old recent-era equivalent)
+    # Deprecates the absolute spread_price=0.20 / slippage_price=0.02 knobs.
+    spread_atr_frac: float = 0.0623     # round-trip spread as a fraction of entry ATR
+    slippage_atr_frac: float = 0.0030   # per-side slippage as a fraction of entry ATR
     commission_per_trade: float = 0.01
 
     # Reward shaping.

@@ -401,3 +401,42 @@ N6 verdict recorded ✓. Phase B is now unblocked on data; config still points a
 the old default CSV — switching `csv_path` (+ pinning the lockbox date) belongs
 to the Phase-B runner, not this chunk.
 
+---
+
+## Task 6 — ATR-relative execution cost (honest-anchor fix)  ✅ (2026-07-02)
+
+**Ratified decision:** cost model → ATR-relative, calibrated from the measured
+0.41 recent OANDA spread. Training-changing (like N1); landed BEFORE the
+baseline so the anchor isn't cost-optimistic.
+
+**Pinned BY MEASUREMENT (never tuned to a result):**
+`spread_atr_frac = 0.41 / 6.586 = 0.0623`, `slippage_atr_frac = 0.02 / 6.586 =
+0.0030`, where 0.41 = median OANDA spread over 2023–2026 (0b splice census) and
+6.586 = median H1 ATR(14) over the SAME window, computed from the backbone.
+
+**Why (measured era table):** the old fixed 0.20 spread charged **7.7% of ATR
+in 2006 but 0.9% in 2026** (8× regime distortion) and, at the real 0.41 recent
+spread, **undercharged the recent era ~2×**. ATR-relative keeps cost
+dimensionless (features/reward/brackets already are; doc-02/05 multi-instrument
+direction) and makes cost-per-R depend only on the SL bucket:
+**1R TP now nets a constant 0.96585R; SL loses 1.03415R — every era.**
+
+**Changes:** `env_bracket.py` — `spread_atr_frac`/`slippage_atr_frac` params,
+`_half_cost(atr)`, both legs priced at the trade's **entry-bar ATR** (stored as
+`Position.entry_atr`, also logged per-trade); `config.py` — knobs + calibration
+provenance (absolutes deprecated/removed); pass-throughs updated in
+`train_ppo.build_env` + `run_info`, `run_pipeline.py`, all 3 notebooks (5 env
+cells), and the zero-cost fixtures in checks (N1 census math now prices
+expected fills at per-trade `entry_atr`). Parameter RENAME on purpose: stale
+call sites fail loudly instead of silently keeping absolute semantics.
+
+**Verified (`checks/check_atr_cost.py`) — ALL PASS:** hand-exact charge at a
+known ATR; **regime independence** (identical R at ATR=2 and ATR=20);
+calibration figures (0.96585R / −1.03415R); **entry-ATR pinning** (mid-trade
+ATR spike does not re-price the exit). Full regression sweep: all 7 prior
+checks + end-to-end smoke train green under the new model.
+
+**Impact:** pre/post-ATR-cost numbers are NOT comparable (intended). The
+doc-05 P2 companion (making cost OBSERVABLE to the agent) remains a Phase-C
+item — this task changes what the sim charges, not what the agent sees.
+

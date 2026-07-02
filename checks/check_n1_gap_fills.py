@@ -48,7 +48,7 @@ def _make_env(m1_rows):
         index=m1i)
     return BracketTradingEnv(
         ddf, m1, ["f1"], sl_atr_multipliers=(1.0,), tp_r_multipliers=(1.0,),
-        spread_price=0.0, slippage_price=0.0, commission_per_trade=0.0,
+        spread_atr_frac=0.0, slippage_atr_frac=0.0, commission_per_trade=0.0,
         holding_penalty=0.0, reward_mtm_weight=0.0,
     )
 
@@ -112,7 +112,7 @@ def census_replay() -> None:
             sl_atr_multipliers=CFG.sl_atr_multipliers,
             tp_r_multipliers=CFG.tp_r_multipliers,
             initial_equity=CFG.initial_equity, risk_fraction=CFG.risk_fraction,
-            spread_price=CFG.spread_price, slippage_price=CFG.slippage_price,
+            spread_atr_frac=CFG.spread_atr_frac, slippage_atr_frac=CFG.slippage_atr_frac,
             commission_per_trade=CFG.commission_per_trade,
         )
         env.reset()
@@ -122,11 +122,12 @@ def census_replay() -> None:
             _, _, terminated, truncated, _ = env.step(action)
         trades = env.trade_log()
         gaps = trades[trades["exit_reason"] == "SL_gap"]
-        half_cost = CFG.spread_price / 2.0 + CFG.slippage_price
         for _, tr in gaps.iterrows():
             open_raw = float(m1_open.loc[tr["exit_time"]])
             d = tr["direction"]
             raw_fill = min(open_raw, tr["sl"]) if d == 1 else max(open_raw, tr["sl"])
+            # ATR-relative cost: both legs priced at the trade's ENTRY-bar ATR.
+            half_cost = (CFG.spread_atr_frac / 2.0 + CFG.slippage_atr_frac) * tr["entry_atr"]
             expect = raw_fill - d * half_cost           # _exit_price re-applies costs
             assert abs(tr["exit_price"] - expect) < 1e-6, (tr["exit_time"], tr["exit_price"], expect)
             sl_dist = abs(tr["entry_price"] - tr["sl"])

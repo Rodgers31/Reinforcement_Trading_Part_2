@@ -43,7 +43,7 @@ def synthetic_check() -> None:
                                 "2024-01-02 02:30"]))
     env = BracketTradingEnv(
         ddf, m1, ["f1"], sl_atr_multipliers=(1.0,), tp_r_multipliers=(1.0,),
-        spread_price=0.0, slippage_price=0.0, commission_per_trade=0.0,
+        spread_atr_frac=0.0, slippage_atr_frac=0.0, commission_per_trade=0.0,
         holding_penalty=0.0, reward_mtm_weight=0.0,
     )
     env.reset()

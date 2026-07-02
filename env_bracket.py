@@ -25,6 +25,7 @@ class Position:
     sl_distance: float = 0.0
     tp_r: float = 0.0          # planned TP R-multiple (bracket choice)
     sl_atr_mult: float = 0.0   # planned SL ATR multiplier (bracket choice)
+    entry_atr: float = 0.0     # ATR at entry — prices BOTH cost legs (ATR-relative cost)
     bars_in_trade: int = 0
 
 
@@ -51,8 +52,12 @@ class BracketTradingEnv(gym.Env):
         tp_r_multipliers=(1.0, 1.5, 2.0, 3.0),
         initial_equity: float = 10_000.0,
         risk_fraction: float = 0.005,
-        spread_price: float = 0.20,
-        slippage_price: float = 0.02,
+        # ATR-relative execution cost (2026-07-02, honest-anchor fix like N1):
+        # round-trip cost scales with the trade's ENTRY-bar ATR, keeping cost
+        # dimensionless across regimes/instruments — a fixed absolute spread
+        # mis-charges across a 20y backbone (see config.py calibration note).
+        spread_atr_frac: float = 0.0623,
+        slippage_atr_frac: float = 0.0030,
         commission_per_trade: float = 0.0,
         holding_penalty: float = 0.00002,
         reward_mtm_weight: float = 0.01,
@@ -67,8 +72,8 @@ class BracketTradingEnv(gym.Env):
         self.tp_r_multipliers = tuple(tp_r_multipliers)
         self.initial_equity = float(initial_equity)
         self.risk_fraction = float(risk_fraction)
-        self.spread_price = float(spread_price)
-        self.slippage_price = float(slippage_price)
+        self.spread_atr_frac = float(spread_atr_frac)
+        self.slippage_atr_frac = float(slippage_atr_frac)
         self.commission_per_trade = float(commission_per_trade)
         self.holding_penalty = float(holding_penalty)
         self.reward_mtm_weight = float(reward_mtm_weight)
@@ -156,12 +161,19 @@ class BracketTradingEnv(gym.Env):
         obs = np.nan_to_num(obs, nan=0.0, posinf=10.0, neginf=-10.0)
         return obs
 
-    def _entry_price(self, close: float, direction: int) -> float:
-        return close + direction * (self.spread_price / 2.0 + self.slippage_price)
+    def _half_cost(self, atr: float) -> float:
+        """Per-side execution cost in price units at a given ATR:
+        half-spread + slippage, both as fractions of ATR."""
+        return (self.spread_atr_frac / 2.0 + self.slippage_atr_frac) * atr
 
-    def _exit_price(self, price: float, direction: int) -> float:
+    def _entry_price(self, close: float, direction: int, atr: float) -> float:
+        return close + direction * self._half_cost(atr)
+
+    def _exit_price(self, price: float, direction: int, entry_atr: float) -> float:
         # Long exits at bid below mid; short exits at ask above mid.
-        return price - direction * (self.spread_price / 2.0 + self.slippage_price)
+        # Both legs are priced at the ENTRY-bar ATR (stored on the Position),
+        # so the M1 fill loop needs no bar-level ATR plumbing.
+        return price - direction * self._half_cost(entry_atr)
 
     def _open_position(self, direction: int, sl_idx: int, tp_idx: int):
         row = self._current_row()
@@ -170,7 +182,7 @@ class BracketTradingEnv(gym.Env):
         sl_atr_mult = self.sl_atr_multipliers[sl_idx]
         sl_dist = max(sl_atr_mult * atr, 1e-8)
         tp_r = self.tp_r_multipliers[tp_idx]
-        entry = self._entry_price(close, direction)
+        entry = self._entry_price(close, direction, atr)
         sl = entry - direction * sl_dist
         tp = entry + direction * tp_r * sl_dist
         risk_cash = max(self.equity * self.risk_fraction, 1e-8)
@@ -187,6 +199,7 @@ class BracketTradingEnv(gym.Env):
             sl_distance=sl_dist,
             tp_r=tp_r,
             sl_atr_mult=sl_atr_mult,
+            entry_atr=atr,
             bars_in_trade=0,
         )
 
@@ -194,7 +207,7 @@ class BracketTradingEnv(gym.Env):
         p = self.position
         if p.direction == 0:
             return 0.0
-        exit_price = self._exit_price(exit_price_raw, p.direction)
+        exit_price = self._exit_price(exit_price_raw, p.direction, p.entry_atr)
         pnl = (exit_price - p.entry_price) * p.units * p.direction - self.commission_per_trade
         self.equity += pnl
         self.realized_pnl += pnl
@@ -209,6 +222,8 @@ class BracketTradingEnv(gym.Env):
             "tp": p.tp,
             "sl_atr_mult": p.sl_atr_mult,   # bracket choice: SL ATR multiplier
             "tp_r_bracket": p.tp_r,          # bracket choice: planned TP R-multiple
+            "entry_atr": p.entry_atr,        # ATR that priced this trade's costs
+
             "units": p.units,
             "pnl": pnl,
             "r_mult": r_mult,                # realized R-multiple (actual outcome)
