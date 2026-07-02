@@ -192,7 +192,35 @@ edited twice), B2 checks pass, and `smoke_test.py` re-ran end-to-end with
 exit 0 — the training path is byte-identical in behavior (B1/B3 never touch it;
 B2's diff is post-training only).
 
-**Phase-A checkpoint:** B1–B3 complete (commits `ba948c9`, `7a4c3c2`, + B3).
-STOPPED per plan — the rest of Phase A (MTM equity, multi-seed harness, pinned
-metric, gate re-form N3, N1 fill-model decision, lockbox carve) awaits sign-off.
+**Phase-A checkpoint:** B1–B3 complete (commits `ba948c9`, `7a4c3c2`, `e980627`).
+User signed off; decisions ratified: N1 lands in Phase A; N3 goes
+fraction/quantile (params to be proposed); push branch for backup.
+
+---
+
+## Task 3a — N1 fix: honest gap-through-SL fills  ✅ (2026-07-01)
+
+**Change (training-affecting BY DESIGN — the honest anchor):** the M1 fill sim
+filled SL at the bracket price even when the bar OPENED beyond it
+(`env_bracket.py:252` pre-fix), and pre-extracted only High/Low
+(`env_bracket.py:83-85` pre-fix). Now: `self._m1_open` is pre-extracted, each M1
+bar checks the open first — long SL fills at `min(open, sl)`, short at
+`max(open, sl)` — and the gapped price flows into `_close_position` (spread/
+slippage logic unchanged). Gap fills are tagged `exit_reason="SL_gap"`. TP still
+fills AT the TP price even on a favorable gap (house pessimism, mirrors
+SL-first).
+
+**Verification (`checks/check_n1_gap_fills.py`) — ALL PASS:**
+- Synthetic gap bars, zero costs → exact R arithmetic: long gap −3R (was −1R),
+  short gap −3R, normal SL −1R unchanged, favorable TP gap +1R (not +2R),
+  both-hit gap bar → SL-first preserved at the gapped fill.
+- Census replay on the real smoke window (365d, always-long + always-short
+  scripted passes, 1×ATR stops): **11 SL_gap fills, every one verified
+  fill-at-open net of costs; ≈11.6R total was previously under-booked
+  (≈1.05R extra loss per gap event)** — the old model flattered exactly as
+  doc 05 N1 predicted.
+
+**Impact:** all future training/backtests price gap risk; numbers are NOT
+comparable to pre-N1 runs (intended — that is the point of fixing the ruler
+before the Phase-B baseline).
 

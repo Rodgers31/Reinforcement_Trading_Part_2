@@ -76,10 +76,13 @@ class BracketTradingEnv(gym.Env):
 
         self.randomize_start = randomize_start
 
-        # Pre-extract M1 high/low as contiguous numpy arrays and cache the
+        # Pre-extract M1 open/high/low as contiguous numpy arrays and cache the
         # sorted DatetimeIndex for O(log n) searchsorted lookups.
         # This replaces the O(n) boolean-mask scan on every step — with 1.5 M
         # M1 bars the speedup is ~100-200x per step.
+        # Open is needed for honest gap-through-SL fills (doc 05 N1): if a bar
+        # OPENS beyond the stop, the realistic fill is the open, not the stop.
+        self._m1_open  = self.m1_df["Open"].to_numpy(dtype=np.float64)
         self._m1_high  = self.m1_df["High"].to_numpy(dtype=np.float64)
         self._m1_low   = self.m1_df["Low"].to_numpy(dtype=np.float64)
         self._m1_index = self.m1_df.index  # DatetimeIndex (sorted, tz-aware)
@@ -235,23 +238,32 @@ class BracketTradingEnv(gym.Env):
 
         realized = 0.0
         for idx in range(lo, hi):
-            high = self._m1_high[idx]
-            low  = self._m1_low[idx]
+            open_ = self._m1_open[idx]
+            high  = self._m1_high[idx]
+            low   = self._m1_low[idx]
             p = self.position
             if p.direction == 0:
                 break
             if p.direction == 1:
                 sl_hit = low  <= p.sl
                 tp_hit = high >= p.tp
+                # Gap-through-SL (doc 05 N1): if the bar OPENS beyond the stop
+                # (weekend reopen / news gap), the realistic fill is the open —
+                # a stop cannot execute at a price the market never traded.
+                sl_fill = min(open_, p.sl)
             else:
                 sl_hit = high >= p.sl
                 tp_hit = low  <= p.tp
+                sl_fill = max(open_, p.sl)
 
             # Pessimistic intrabar rule: if both touched, assume SL first.
             if sl_hit:
-                realized += self._close_position(p.sl, self._m1_index[idx], "SL")
+                reason = "SL_gap" if sl_fill != p.sl else "SL"
+                realized += self._close_position(sl_fill, self._m1_index[idx], reason)
                 break
             if tp_hit:
+                # TP stays filled AT the TP price even when the bar gapped past
+                # it in our favor — keeps the house pessimism (mirrors SL-first).
                 realized += self._close_position(p.tp, self._m1_index[idx], "TP")
                 break
         return realized
