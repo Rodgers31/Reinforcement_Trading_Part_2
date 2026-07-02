@@ -166,3 +166,33 @@ untouched; the default sliding path never executes this code. Per-fold summary
 numbers and the gate decision on the BLOCK scheme may legitimately change —
 they now measure the model that would actually ship (that is the fix).
 
+---
+
+## Task 2c — B3 fix: notebook pairs best checkpoint with its own vecnorm  ✅ (2026-07-01)
+
+**Re-verified against live source:** `test_analysis.ipynb` cell `b8bbe8e7` ran all
+three BEST_VAL evaluations with `VECNORM_PATH` (the FINAL model's normalization);
+`test_analysis_folds.ipynb` already used `BEST_VECNORM_PATH` correctly — the fix
+was never backported (doc 01 B3). Obs stats drift across training, so the final
+stats mis-normalize the earlier best checkpoint — the notebook's stored headline
+numbers (best-val Test +70%) were computed under the wrong normalization.
+
+**Fix (mirrors the folds notebook):** cell `b8bbe8e7` now defines
+`BEST_VECNORM_PATH = run_info.get('best_model_vecnorm_path', models/best_model/
+best_model_vecnorm.pkl)` and the three `bv_*` calls pass it; `FINAL_MODEL` keeps
+`VECNORM_PATH` (its own stats). Everything else in the cell is unchanged.
+
+**Repro (`checks/check_b3_notebook_pairing.py`) — ALL PASS:** static JSON parse
+asserts best↔best-vecnorm and final↔final-vecnorm in BOTH notebooks (the folds
+notebook doubles as the reference invariant, so a future regression in either
+gets caught).
+
+**Regression sweep after all three fixes:** B1 checks re-pass (same notebook
+edited twice), B2 checks pass, and `smoke_test.py` re-ran end-to-end with
+exit 0 — the training path is byte-identical in behavior (B1/B3 never touch it;
+B2's diff is post-training only).
+
+**Phase-A checkpoint:** B1–B3 complete (commits `ba948c9`, `7a4c3c2`, + B3).
+STOPPED per plan — the rest of Phase A (MTM equity, multi-seed harness, pinned
+metric, gate re-form N3, N1 fill-model decision, lockbox carve) awaits sign-off.
+
