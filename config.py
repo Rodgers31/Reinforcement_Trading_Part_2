@@ -112,6 +112,15 @@ class ProjectConfig:
     sliding_test_months: int = 6
     sliding_step_months: int = 6
 
+    # ── Final lockbox (Phase E) ──────────────────────────────────────────────
+    # Tail period excluded from the ENTIRE sliding walk-forward sweep — no fold
+    # (train, val, or test) may touch bars at/after this date, so iterating on
+    # the dev surface can never contaminate it (doc 03 §7, doc 04 Phase A/E).
+    # The concrete date gets pinned when the deep Dukascopy backbone lands;
+    # it is revealed ONCE, for the single final chosen system.
+    # Format "YYYY-MM-DD" (naive dates are localized to the data's timezone).
+    lockbox_start_date: Optional[str] = None
+
     # ── Walk-forward deployment gate ─────────────────────────────────────────
     # After the folds finish, the final fold is promoted to the production slot
     # (models/) ONLY if the out-of-sample folds are consistently good. Otherwise

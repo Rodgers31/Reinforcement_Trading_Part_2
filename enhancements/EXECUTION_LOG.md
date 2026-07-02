@@ -254,3 +254,55 @@ before the Phase-B baseline).
 intended ruler change; trained weights are unaffected (eval-side only). H1-close
 marks still miss intra-bar extremes — doc 05 records this as a lower bound.
 
+---
+
+## Task 3c — Multi-seed evaluation harness  ✅ (2026-07-01)
+
+`eval_harness.py`: `multi_seed_run(run_fn, seeds)` → per-seed frame +
+median/IQR/range; gate failures counted and warned LOUDLY but kept in the
+distribution (hiding them would bias comparisons). Provisional metric helper
+`metric_return_over_mtm_dd` (marked PROVISIONAL pending the task-5 pin).
+Default seeds (42–46); cheap ranking = first 3, finalists = 5.
+
+**Verified (`checks/check_multi_seed_harness.py`) — ALL PASS:** synthetic
+distribution arithmetic exact (median/quartiles/warning/KeyError); real
+integration — two 3k-step trainings on smoke data → deterministic val rollouts
+→ distribution (median +0.872, range [+0.425, +1.320] across just 2 seeds of an
+identical config — the seed-variance evidence that motivates the harness).
+
+---
+
+## Task 3d — Lockbox-carve mechanism  ✅ (2026-07-01)
+
+`config.py` gains `lockbox_start_date` (default None — the concrete date gets
+pinned when the Dukascopy backbone lands); `make_sliding_folds` gains
+`lockbox_start` and truncates the frame BEFORE any fold is cut, so no train/
+val/test window can ever touch the reserved tail; `train_sliding_walk_forward`
+passes `CFG.lockbox_start_date` and announces an active lockbox loudly.
+
+**Verified (`checks/check_lockbox_carve.py`) — ALL PASS**, naive + tz-aware:
+without carve the sweep reaches past the cut; with carve every window ends
+strictly before it, folds equal the pre-truncated-frame result (equivalence),
+and `None` is a proven no-op.
+
+**Regression sweep after all Phase-A changes:** all six check scripts
+(B1/B2/B3/N1/MTM/lockbox) pass together.
+
+---
+
+## Phase-A checkpoint 2 — awaiting reviewer sign-off (2026-07-01)
+
+DONE: N1 honest fills, MTM equity + trade-Sharpe, multi-seed harness, lockbox
+carve (4 commits). PROPOSED, NOT IMPLEMENTED (pin-by-reasoning rule):
+- **N3 gate re-form params** — proposal in the checkpoint report: breadth
+  `min_consistent_fold_frac = 0.70` (reproduces the old 4-of-5 exactly at n=5;
+  ≈0.8% luck-pass probability under a no-edge null at n=34) + PF floor at the
+  **10th percentile ≥ 0.90** (matches old worst-of-5 semantics at n=5;
+  tolerates ~3 bad folds of 34) + mean trade-Sharpe > 0 once the metric pin
+  lands. Awaiting sign-off.
+- **Primary metric + ship threshold** — proposal: median across 5 seeds of
+  stitched-OOS return ÷ |stitched MTM maxDD|; ship on ≥ +10% relative median
+  improvement with ≥4/5 seed-consistency and no gate regression. Awaiting
+  sign-off.
+Phase B (baseline) remains blocked on the 0b Dukascopy backbone + these pins.
+

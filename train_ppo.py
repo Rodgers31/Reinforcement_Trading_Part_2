@@ -967,7 +967,11 @@ def train_sliding_walk_forward(
         test_months=CFG.sliding_test_months,
         step_months=CFG.sliding_step_months,
         embargo_bars=CFG.split_embargo_bars,
+        lockbox_start=CFG.lockbox_start_date,
     )
+    if CFG.lockbox_start_date:
+        print(f"  LOCKBOX: bars from {CFG.lockbox_start_date} onward are EXCLUDED "
+              f"from every fold — reserved for the one-time Phase-E reveal.")
     n_folds = len(folds)
     if n_folds == 0:
         raise ValueError("No sliding folds produced — not enough data for the "
