@@ -217,7 +217,10 @@ class _ConsistencyEvalCallback(BaseCallback):
         capture = venv.venv.envs[0]
         eq = capture.saved_equity
         if eq is not None and not eq.empty and "equity" in eq:
-            max_dd_pct = float(abs(drawdown(eq["equity"].astype(float)).min()) * 100.0)
+            # Honest risk (doc 03 §3.9a): select on MARK-TO-MARKET drawdown when
+            # available — realized-only equity understates intra-trade pain.
+            dd_col = "equity_mtm" if "equity_mtm" in eq.columns else "equity"
+            max_dd_pct = float(abs(drawdown(eq[dd_col].astype(float)).min()) * 100.0)
             n_trades = len(capture.saved_trades) if capture.saved_trades is not None else 0
         else:
             max_dd_pct = 0.0
@@ -862,9 +865,11 @@ def train_walk_forward(
             "val_end": va.index.max().date(),
             "val_return_pct": rep.get("total_return_pct"),
             "val_sharpe": rep.get("sharpe_like"),
+            "val_sharpe_trade": rep.get("sharpe_trade"),
             "val_profit_factor": rep.get("profit_factor"),
             "val_win_rate_pct": rep.get("win_rate_pct"),
             "val_max_dd_pct": rep.get("max_drawdown_pct"),
+            "val_max_dd_mtm_pct": rep.get("max_drawdown_mtm_pct"),
             "val_avg_r": rep.get("avg_r"),
             "val_n_trades": rep.get("n_trades"),
         })
@@ -1022,9 +1027,11 @@ def train_sliding_walk_forward(
             "val_profit_factor": val_rep.get("profit_factor"),
             "test_return_pct": test_rep.get("total_return_pct"),
             "test_sharpe": test_rep.get("sharpe_like"),
+            "test_sharpe_trade": test_rep.get("sharpe_trade"),
             "test_profit_factor": test_rep.get("profit_factor"),
             "test_win_rate_pct": test_rep.get("win_rate_pct"),
             "test_max_dd_pct": test_rep.get("max_drawdown_pct"),
+            "test_max_dd_mtm_pct": test_rep.get("max_drawdown_mtm_pct"),
             "test_avg_r": test_rep.get("avg_r"),
             "test_n_trades": test_rep.get("n_trades"),
         })
@@ -1038,17 +1045,20 @@ def train_sliding_walk_forward(
     summary.to_csv(summary_path, index=False)
 
     # ── Stitch every fold's test window into one continuous OOS equity curve ──
+    # Both realized and mark-to-market columns are chained with the same
+    # compounding factor (fold handoff is anchored on realized end equity).
     running = CFG.initial_equity
     parts = []
     for eq in test_equities:
         if eq is None or eq.empty or "equity" not in eq:
             continue
-        s = eq["equity"].astype(float)
-        scaled = s / CFG.initial_equity * running          # chain (compound) folds
-        parts.append(scaled)
-        running = float(scaled.iloc[-1])
-    stitched = pd.concat(parts) if parts else pd.Series(dtype=float)
-    stitched_df = stitched.to_frame("equity")
+        factor = running / CFG.initial_equity              # chain (compound) folds
+        block = pd.DataFrame({"equity": eq["equity"].astype(float) * factor})
+        if "equity_mtm" in eq.columns:
+            block["equity_mtm"] = eq["equity_mtm"].astype(float) * factor
+        parts.append(block)
+        running = float(block["equity"].iloc[-1])
+    stitched_df = pd.concat(parts) if parts else pd.DataFrame(columns=["equity"])
     stitched_path = Path(out_dir) / "sliding_oos_equity.csv"
     stitched_df.to_csv(stitched_path)
 
@@ -1069,8 +1079,8 @@ def train_sliding_walk_forward(
     print(f"  Test folds profit factor>1 : {pf_ok}/{n_folds}")
     print("\n  STITCHED out-of-sample track record (compounded across all test windows):")
     print(f"    total return : {oos.get('total_return_pct'):+.1f}%")
-    print(f"    Sharpe-like  : {oos.get('sharpe_like'):+.2f}")
-    print(f"    max drawdown : {oos.get('max_drawdown_pct'):+.1f}%")
+    print(f"    Sharpe-like  : {oos.get('sharpe_like'):+.2f}   trade-Sharpe: {oos.get('sharpe_trade'):+.2f}")
+    print(f"    max drawdown : {oos.get('max_drawdown_pct'):+.1f}%  (MTM: {oos.get('max_drawdown_mtm_pct'):+.1f}%)")
     print(f"    profit factor: {oos.get('profit_factor'):.2f}   trades: {oos.get('n_trades')}")
     print(f"    curve → {stitched_path}")
 

@@ -314,6 +314,10 @@ class BracketTradingEnv(gym.Env):
         self.history.append({
             "time": self._current_time(),
             "equity": self.equity,
+            # Mark-to-market equity (doc 03 §3.9a): realized + open-position
+            # unrealized PnL marked at this bar's close. Realized-only equity
+            # understates intra-trade drawdown; risk metrics should use this.
+            "equity_mtm": self.equity + unrealized,
             "realized_pnl": self.realized_pnl,
             "position": self.position.direction,
             "close": close,

@@ -224,3 +224,33 @@ SL-first).
 comparable to pre-N1 runs (intended — that is the point of fixing the ruler
 before the Phase-B baseline).
 
+---
+
+## Task 3b — MTM equity + trade-based Sharpe (doc 03 §3.9a/b)  ✅ (2026-07-01)
+
+**Changes:**
+- `env_bracket.py` — history now records `equity_mtm` (realized + open-position
+  unrealized, marked at the bar close) beside the realized-only `equity`.
+- `evaluate.py` — `max_drawdown_mtm_pct` in `summarize_equity`; new
+  `trade_based_sharpe()` (mean/std of per-trade R × √(annual trade rate)),
+  reported as `sharpe_trade` in `full_report`. Legacy `sharpe_like` retained
+  for continuity until the metric pin (task 5) is ratified.
+- `train_ppo.py` — **checkpoint selection now uses MTM drawdown**
+  (`_run_one_episode` picks `equity_mtm` when present — part of the honest
+  ruler: selection must not be flattered by realized-only DD); sliding/block
+  summary rows gain `*_sharpe_trade` + `*_max_dd_mtm_pct`; the stitched OOS
+  curve now carries a chained `equity_mtm` column and the stitched report
+  prints both DDs + trade-Sharpe.
+
+**Verification (`checks/check_mtm_equity.py`) — ALL PASS:**
+- Synthetic dip-then-TP trade: realized DD **0.00%** (the old flattering
+  number) vs MTM DD **−0.40%** — exact to construction.
+- `trade_based_sharpe` arithmetic vs hand-computed value; NaN guards (<2 trades).
+- Real measurement (smoke best model on its val split, 33 trades): realized
+  maxDD **−1.55%** vs MTM **−1.87%** — a 0.32pp understatement even on this
+  tiny fixture; the gap grows with hold time and position count.
+
+**Note:** selection-behavior change (MTM DD in the consistency score) is an
+intended ruler change; trained weights are unaffected (eval-side only). H1-close
+marks still miss intra-bar extremes — doc 05 records this as a lower bound.
+

@@ -45,12 +45,19 @@ def summarize_equity(equity_df: pd.DataFrame, initial_equity: float = 10_000.0,
     if np.isfinite(ann_return) and abs(max_dd) > 1e-10:
         calmar = ann_return / abs(max_dd)
 
+    # Mark-to-market drawdown (doc 03 §3.9a): includes open-position unrealized
+    # PnL, so intra-trade pain is measured — realized-only DD understates it.
+    max_dd_mtm = np.nan
+    if "equity_mtm" in equity_df.columns:
+        max_dd_mtm = drawdown(equity_df["equity_mtm"].astype(float)).min()
+
     return {
         "initial_equity": initial_equity,
         "final_equity": float(eq.iloc[-1]),
         "total_return_pct": float(total_return * 100),
         "annualized_return_pct": float(ann_return * 100) if np.isfinite(ann_return) else np.nan,
         "max_drawdown_pct": float(max_dd * 100),
+        "max_drawdown_mtm_pct": float(max_dd_mtm * 100) if np.isfinite(max_dd_mtm) else np.nan,
         "sharpe_like": float(sharpe) if np.isfinite(sharpe) else np.nan,
         "sortino_ratio": float(sortino) if np.isfinite(sortino) else np.nan,
         "calmar_ratio": float(calmar) if np.isfinite(calmar) else np.nan,
@@ -82,6 +89,26 @@ def summarize_trades(trades: pd.DataFrame) -> dict:
     }
 
 
+def trade_based_sharpe(trades: pd.DataFrame, n_bars: int,
+                       periods_per_year: int) -> float:
+    """Sharpe over per-trade R-multiples, annualised by the realized trade rate.
+
+    Doc 03 §3.9b: the per-bar Sharpe on a mostly-flat realized-equity step
+    series (annualised by the full bar count) is noisy and easy to misread.
+    Per-trade R-multiples are the natural unit of this system's risk.
+    """
+    if trades is None or trades.empty or n_bars <= 0:
+        return float("nan")
+    r = trades["r_mult"].astype(float)
+    if len(r) < 2:
+        return float("nan")
+    sd = r.std(ddof=1)
+    years = n_bars / float(periods_per_year)
+    if not np.isfinite(sd) or sd <= 0 or years <= 0:
+        return float("nan")
+    return float(r.mean() / sd * np.sqrt(len(r) / years))
+
+
 def full_report(equity_df: pd.DataFrame, trades: pd.DataFrame,
                 initial_equity: float = 10_000.0,
                 periods_per_year: int = 252 * 24 * 12) -> pd.DataFrame:
@@ -89,4 +116,6 @@ def full_report(equity_df: pd.DataFrame, trades: pd.DataFrame,
     d.update(summarize_equity(equity_df, initial_equity=initial_equity,
                               periods_per_year=periods_per_year))
     d.update(summarize_trades(trades))
+    d["sharpe_trade"] = trade_based_sharpe(
+        trades, n_bars=len(equity_df), periods_per_year=periods_per_year)
     return pd.DataFrame.from_dict(d, orient="index", columns=["value"])
