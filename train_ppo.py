@@ -834,7 +834,7 @@ def train_walk_forward(
               f"\n   budget {fold_ts:,} steps (~{passes:.0f} passes), eval every "
               f"{eval_freq_k:,}  → {fold_dir}")
 
-        model, _ = train(
+        train(
             total_timesteps=fold_ts,
             seed=seed,
             out_dir=fold_dir,
@@ -847,13 +847,12 @@ def train_walk_forward(
             datasets=(m1, feature_cols, tr, va, test_feat),
         )
 
-        # Re-evaluate the just-trained fold model on its own (OOS) val window,
-        # preferring the best (eligible) checkpoint + its normalisation snapshot.
-        _, run_info = load_run_info(fold_dir)
-        if "best_model_vecnorm_path" in run_info:
-            vecnorm_path = Path(fold_dir) / "best_model" / "best_model_vecnorm.pkl"
-        else:
-            vecnorm_path = Path(fold_dir) / Path(run_info["vecnorm_path"]).name
+        # Re-evaluate the fold's DEPLOYABLE checkpoint on its own (OOS) val
+        # window: the best (eligible) checkpoint paired with ITS OWN VecNormalize
+        # snapshot, exactly like the sliding path does (B2 fix — this previously
+        # scored the FINAL in-memory model under the BEST checkpoint's vecnorm,
+        # a mismatched pair that fed the per-fold summary and the gate).
+        model, vecnorm_path = _load_fold_model(fold_dir)
         rep = evaluate_on_split(model, vecnorm_path, m1, feature_cols, va)
         summary_rows.append({
             "fold": k,

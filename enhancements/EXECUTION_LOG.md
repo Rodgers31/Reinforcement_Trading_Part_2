@@ -138,3 +138,31 @@ Fixture auto-removed; refuses to overwrite a real `models/run_info.json`.
 path. On the default sliding path, behavior changes only when a run's gate
 FAILED — which is the fix, not a regression. Trained weights unaffected.
 
+---
+
+## Task 2b — B2 fix: block walk-forward scores the deployable pair  ✅ (2026-07-01)
+
+**Re-verified against live source:** `train_walk_forward` bound the FINAL
+in-memory model from `train()` (`train_ppo.py:837`) yet loaded the BEST
+checkpoint's vecnorm (`train_ppo.py:852-856`), then fed that mismatched pair to
+`evaluate_on_split` → the per-fold summary AND the deployment gate
+(`train_ppo.py:899`). The sliding path's `_load_fold_model` was already correct.
+
+**Fix:** the fold evaluation now loads the deployable pair via
+`_load_fold_model(fold_dir)` — best (eligible) checkpoint + its own
+`best_model_vecnorm.pkl`, falling back to the final pair only when no best
+exists — mirroring the sliding path. `train()`'s return value is no longer
+bound; the manual path reconstruction is gone.
+
+**Repro (`checks/check_b2_vecnorm_pairing.py`) — ALL PASS**, using
+`models/smoke/` as a fold fixture (no training run): (1) `_load_fold_model`
+returns weights tensor-equal to `best_model.zip` and different from the final
+model, paired with the best checkpoint's own vecnorm path; (2) static — the
+walk-forward body uses `_load_fold_model` and the old mismatched binding is gone.
+
+**Measurement-only:** the diff is confined to the post-training evaluation block
+inside `train_walk_forward` (after `train()` returns). The training loop is
+untouched; the default sliding path never executes this code. Per-fold summary
+numbers and the gate decision on the BLOCK scheme may legitimately change —
+they now measure the model that would actually ship (that is the fix).
+
