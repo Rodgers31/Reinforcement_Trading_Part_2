@@ -33,20 +33,15 @@ _BARS_PER_YEAR: dict[str, int] = {
 
 @dataclass
 class ProjectConfig:
-    # Path to your full MT4/MT5-style minute CSV.
-    # Long Bid file (May 2003 – May 2026, ~23 years) — primary dataset: enough
-    # history for several walk-forward folds plus a multi-year sealed test.
-    csv_path: Path = Path("data/XAUUSD_1 Min_Bid_2003.05.05_2026.05.31.csv")
-    # Short Ask file (Jan 2020 – Jan 2026, ~6 years) — kept as a fast smoke-test
-    # dataset; uncomment to fall back to it.
-    #csv_path: Path = Path("data/XAUUSD_1 Min_Ask_2020.01.09_2026.01.15.csv")
-
-    # Your file column is usually exactly "Time (EET)".
-    time_col: str = "Time (EET)"
-
-    # Many brokers call this EET but actually follow EET/EEST server time.
-    # Europe/Helsinki is a practical EET/EEST timezone choice.
-    source_tz: str = "Europe/Helsinki"
+    # ── Production dataset (switched 2026-07-02, Phase B) ────────────────────
+    # Dukascopy XAUUSD M1 BID backbone, 2003-05-05 → 2026-07-02 (7.85M rows),
+    # acquired + validated on the 0b track (see enhancements/EXECUTION_LOG.md):
+    # splice vs OANDA within spread (median |mid diff| 0.025 vs 0.410 spread),
+    # lag-0 aligned, 25 features 0 NaN/inf, leakage guardrail PASS.
+    # LEAN convention: DateTime,O,H,L,C,V; UTC; bar-open stamps.
+    csv_path: Path = Path("data/XAUUSD_M1_Bid_Dukascopy_2003.05.05_2026.07.02.csv")
+    time_col: str = "DateTime"
+    source_tz: str = "UTC"
 
     # MT4/MT5-style M1 exports usually timestamp each row at candle OPEN.
     # Internally the project indexes bars by CLOSE time so a decision timestamp
@@ -63,7 +58,10 @@ class ProjectConfig:
     # 90 days ≈ 25 K M5 bars / ~2 K H1 bars. Enough for pipeline smoke-tests
     # but too small for a publishable result.
     max_days_for_demo: Optional[int] = None
-    start_date: Optional[str] = None
+    # 0b census: 2003 is sparse (~40% density) and 2004-05 ramp; the backbone
+    # is fully dense from 2006 (333-365k bars/yr). Training universe starts
+    # at the clean start so fill simulation quality is uniform.
+    start_date: Optional[str] = "2006-01-01"
     end_date: Optional[str] = None
 
     # ── Validation scheme ────────────────────────────────────────────────────
@@ -119,7 +117,9 @@ class ProjectConfig:
     # The concrete date gets pinned when the deep Dukascopy backbone lands;
     # it is revealed ONCE, for the single final chosen system.
     # Format "YYYY-MM-DD" (naive dates are localized to the data's timezone).
-    lockbox_start_date: Optional[str] = None
+    # PINNED 2026-07-02 (ratified): final 24 months reserved — the sweep ends
+    # at 2024-07-01; everything after is the one-time Phase-E reveal.
+    lockbox_start_date: Optional[str] = "2024-07-01"
 
     # ── Walk-forward deployment gate (re-formed 2026-07-01, doc 05 N3) ───────
     # After the folds finish, the final fold is promoted to the production slot
