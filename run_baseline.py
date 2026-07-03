@@ -24,7 +24,9 @@ Layout:  runs/<stamp>_<sha>_<label>/
 Usage:
   .venv/bin/python run_baseline.py --label baseline-3seed --seeds 42,43,44
   .venv/bin/python run_baseline.py --resume runs/<dir>          # crash resume
-  .venv/bin/python run_baseline.py --resume runs/<dir> --seeds 45,46   # extension
+  .venv/bin/python run_baseline.py --resume runs/<dir> --seeds 45,46   # extension:
+  #   trains ONLY the new seeds (existing seeds keep their DONE markers) but
+  #   aggregation always finalizes over ALL seeds present on disk in <dir>.
   (internal) --job K SEED --run-dir DIR                          # one job
 """
 from __future__ import annotations
@@ -340,8 +342,20 @@ def main() -> None:
 
     if not args.aggregate_only:
         manage(run_dir, seeds, args.steps, args.concurrency, args.folds_limit)
-    aggregate(run_dir, seeds, args.folds_limit,
-              provisional=(set(seeds) != set(RATIFIED_SEED_SET)))
+
+    # Aggregate over EVERY seed present on disk in the parent run — NOT just this
+    # invocation's --seeds. An extension (--resume --seeds 45,46) trains only the
+    # new seeds but must finalize the FULL baseline; deriving the set from disk
+    # makes "median-of-2 mislabeled as the anchor" structurally impossible.
+    _, _, _folds = _load_folds(args.folds_limit)
+    from collections import Counter
+    done = Counter(int(p.name.split("_s")[1])
+                   for p in (run_dir / "jobs").glob("f*_s*")
+                   if (p / "DONE").exists())
+    agg_seeds = sorted(s for s, c in done.items() if c == len(_folds))
+    print(f"[aggregate] seeds complete on disk: {agg_seeds}", flush=True)
+    aggregate(run_dir, agg_seeds, args.folds_limit,
+              provisional=(set(agg_seeds) != set(RATIFIED_SEED_SET)))
 
 
 if __name__ == "__main__":
