@@ -492,3 +492,49 @@ lockbox — full-test-window requirement, not a bug.
 extend to 5 seeds (+50 fold-seeds) for the ratified metric. Keep 3M
 steps/fold. Background job-pool launcher with per-job registry logging.
 
+---
+
+## Task 8 — 3-seed provisional baseline: PRE-DECLARATION + LAUNCH (2026-07-03)
+
+**APPROVED** by reviewer with binding additions, recorded BEFORE launch:
+
+1. **Seeds pre-declared:** the ratified 5-seed set is **{42, 43, 44, 45, 46}**;
+   this provisional pass runs the first three **{42, 43, 44}**; the extension
+   (on sign-off) adds **{45, 46}** to the SAME parent run. The extension can
+   never be seed-picked — the set is fixed here, in advance, and recorded in
+   the parent registry entry (`ratified_seed_set`).
+2. **Anchor discipline (absolute):** no config, hyperparameter, cost,
+   eligibility, or gate changes in response to anything seen during or after
+   this run. Observations land in the Phase-C candidates list below — nothing
+   else. The baseline measures the system as-is.
+3. **Registry:** parent entry `baseline-3seed` + one job record per fold-seed
+   (`jobs/fKK_sSEED/job.json` + crash-safe DONE marker; resumable pool —
+   interpretation note: per-job entries live as structured job records inside
+   the parent so INDEX.md keeps one line per run). The completed baseline
+   **initializes the running-best pointer by definition**; `gate_passed`
+   records deployability separately — a gate-FAIL baseline is still the anchor.
+4. **Per-seed outputs:** stitched OOS curve (equity+MTM), N3 gate verdict +
+   detail, pinned metric — labeled **median-of-3 PROVISIONAL** (the ratified
+   metric requires 5 seeds).
+5. **Diagnostics to report:** eligibility fraction + per-fold map; train/val
+   sign patterns across all evals; churn (trades/window, exit-reason mix incl.
+   SL_gap); per-fold metric distribution + seed-IQR (feeds the reserved
+   ONE-TIME +10%-margin recalibration — flag only, never recalibrate
+   unilaterally); wall-clock vs the ~10h estimate.
+
+**Launcher:** `run_baseline.py` (committed) — resumable fold×seed subprocess
+pool (2 concurrent × n_envs=4, OMP/MKL threads capped at 2/job as compute
+plumbing), per-job provenance, aggregation + diagnostics + INDEX/running-best
+updates. Mini-tested end-to-end (2 folds × 2 seeds × 6k steps: pool, crash
+markers, resume-skip, aggregation, gate emission, report, INDEX/running-best —
+then fully cleaned up and INDEX restored; one ordering bug found+fixed by the
+mini test, which is why it exists).
+
+### Phase-C candidates list (observations only — nothing changes now)
+- (from sizing) Never-eligible folds fall back to the FINAL checkpoint —
+  consider whether fold-level "no eligible checkpoint" should be surfaced as
+  its own diagnostic/gate leg in Phase C. (doc 03 §3.8 territory.)
+- (from sizing) Both-legs-negative eval pattern under the honest ruler —
+  candidate revisit of reward/selection interplay (doc 03 §3.4b) AFTER the
+  anchor exists.
+

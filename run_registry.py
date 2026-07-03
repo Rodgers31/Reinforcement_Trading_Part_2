@@ -132,3 +132,25 @@ def finalize_run(run_dir: Path, metric_median: float | None = None,
             f"{registry['label']} | {metric_s} | {gate_s} | {verdict} |\n")
     with open(idx, "a") as f:
         f.write(line)
+
+
+def set_running_best(run_dir: Path, note: str, index_path: Path | None = None) -> None:
+    """Move the running-best pointer to `run_dir`.
+
+    Only two legitimate callers exist: (1) the completed BASELINE, which
+    initializes the pointer BY DEFINITION (it is the anchor — a gate-FAIL
+    baseline is still the anchor; deployability is recorded separately), and
+    (2) a Phase-C variant that passed the ratified ship rule. Never move it
+    for a near-miss.
+    """
+    idx = Path(index_path) if index_path else INDEX
+    run_dir = Path(run_dir)
+    label = json.loads((run_dir / "registry.json").read_text())["label"]
+    lines = idx.read_text().splitlines(keepends=True)
+    for i, l in enumerate(lines):
+        if l.startswith("**Running best:**"):
+            lines[i] = f"**Running best:** `{run_dir.name}` ({label}) — {note}\n"
+            break
+    else:
+        raise RuntimeError("INDEX.md has no 'Running best:' pointer line")
+    idx.write_text("".join(lines))
