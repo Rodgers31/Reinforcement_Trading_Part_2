@@ -530,6 +530,32 @@ markers, resume-skip, aggregation, gate emission, report, INDEX/running-best —
 then fully cleaned up and INDEX restored; one ordering bug found+fixed by the
 mini test, which is why it exists).
 
+### PR #1 review triage (2026-07-03, mid-baseline — verified before believing)
+
+Copilot raised 3 findings; each was re-verified against live code assuming it
+was wrong. Governing constraint: newly spawned pool jobs re-execute
+`run_baseline.py` FROM DISK, so mid-run edits to it would make later jobs run
+code differing from the `b9bc9d6` sha in the run's provenance — that file is
+frozen until the pool finishes.
+
+- **F1 (fd "leak" in `manage()`): severity claim REFUTED.** CPython refcounting
+  closes each parent-side log handle when `log` rebinds on the next launch
+  (Popen dups the fd for the child and retains no reference) — steady-state
+  parent handles ≈ 1, not 75; no OS-limit risk. The `with`-block IS better
+  style → **deferred** to the post-run launcher touch (never edit the live
+  launcher mid-run for cosmetics).
+- **F2 (duplicate `import pandas` in `_stitch`): VERIFIED, cosmetic.** Same
+  file, same freeze → **deferred**, batched with F1.
+- **F3 (`smoke_test.py` executes at import): VERIFIED, REAL, FIXED NOW.**
+  Module-level CFG mutation + training, and the filename matches pytest's
+  `*_test.py` collection pattern — future test collection would silently start
+  a training run. Everything moved into `main()` behind the `__main__` guard
+  (same discipline the sizing failure taught). Verified: import is 1ms with
+  zero side effects, CFG untouched. The file is uninvolved in the pool's job
+  path — **zero impact on the running baseline**. Full smoke re-run deferred
+  to the post-baseline sweep (re-running now would churn the models/smoke
+  fixtures the B1/B2 checks use, mid-flight, for no information).
+
 ### Phase-C candidates list (observations only — nothing changes now)
 - (from sizing) Never-eligible folds fall back to the FINAL checkpoint —
   consider whether fold-level "no eligible checkpoint" should be surfaced as
