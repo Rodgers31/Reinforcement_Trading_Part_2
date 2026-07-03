@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from model_artifacts import load_run_info, resolve_project_path, resolve_sb3_model_path
+from model_artifacts import check_gate_approval, load_run_info, resolve_project_path, resolve_sb3_model_path
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -286,7 +286,8 @@ def _feature_collinearity_flags(feat: pd.DataFrame, feature_cols: list[str],
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_diagnostics(models_dir: str = "models", reveal_test: bool = False) -> None:
+def run_diagnostics(models_dir: str = "models", reveal_test: bool = False,
+                    allow_failed_gate: bool = False) -> None:
     from config import CFG
     from data_loader import load_mt_ohlcv_csv, resample_ohlcv, split_train_val_test
     from features import prepare_feature_frame
@@ -360,6 +361,10 @@ def run_diagnostics(models_dir: str = "models", reveal_test: bool = False) -> No
     vecnorm_path = models_path / "vec_normalize.pkl"
     try:
         _, run_info = load_run_info(models_path)
+        # B1 fix: honor the deployment gate before evaluating/reporting the
+        # production model (SystemExit propagates past the except below).
+        check_gate_approval(run_info, allow_failed=allow_failed_gate,
+                            context="model diagnostics on the production slot")
         # Prefer the best (eligible) checkpoint + its normalisation snapshot so
         # diagnostics evaluate the SAME model that would be deployed — not the
         # final (typically most-overfit) checkpoint.
@@ -432,4 +437,11 @@ def run_diagnostics(models_dir: str = "models", reveal_test: bool = False) -> No
 
 
 if __name__ == "__main__":
-    run_diagnostics()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Post-training diagnostics.")
+    parser.add_argument("--allow-failed-gate", action="store_true",
+                        help="Explicitly diagnose a model whose walk-forward gate "
+                             "FAILED (results are not deployable).")
+    args = parser.parse_args()
+    run_diagnostics(allow_failed_gate=args.allow_failed_gate)

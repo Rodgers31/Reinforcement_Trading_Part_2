@@ -1,0 +1,566 @@
+# Execution log
+
+Chronological record of what was actually run during execution of the doc-04 plan,
+its results, and any deviation. One section per task. Facts are cited to `file:line`
+or to the command/output that produced them.
+
+---
+
+## Task 0 — Environment + git snapshot  ✅ (2026-07-01)
+
+**Machine:** darwin (arm64), Python **3.9.6** (Xcode system interpreter).
+
+**RL stack:** was missing at session start (`gymnasium`, `stable_baselines3`,
+`torch`, `plotly` all `ModuleNotFoundError`; only `numpy 2.0.2` / `pandas 2.3.3` /
+`matplotlib 3.9.4` present) — matches the historical env note.
+
+**Action:** created a project venv and installed the pinned-by-`>=` requirements:
+```
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip setuptools wheel
+.venv/bin/python -m pip install -r requirements.txt
+```
+**Resolved versions (import-verified in the venv):**
+python 3.9.6 · gymnasium **1.1.1** · stable-baselines3 **2.7.1** · torch **2.8.0** ·
+numpy 2.0.2 · pandas 2.3.3 · plotly 6.8.0 · scikit-learn 1.6.1.
+
+> ⚠️ **Watch-item for Task 1:** these are *newer* than the versions the repo code was
+> written against (requirements use `>=`, so pip took the latest). gymnasium 1.x /
+> sb3 2.7 / numpy 2.0 have known API drift vs. earlier releases. The Task-1 smoke-test
+> is the first thing that will actually exercise this — treat any failure there as a
+> possible version-compat issue, not necessarily a code bug. Consider capturing a
+> `pip freeze` lockfile once the smoke-test passes, for reproducibility.
+
+**Git snapshot:** branch `main`, single commit `7615a58 "commit 1"`, working tree
+clean except `?? enhancements/` (untracked) — the whole plan corpus (01–04 + README)
+is not yet version-controlled. `.venv/` is now also untracked (must be git-ignored).
+
+**Task-1 data confirmed on disk:**
+`../trading_bot/market_mechanics_bot/lean_migration/data/XAU_USD_M1.csv` — 69 MB,
+**1,216,345** M1 rows (LEAN format `DateTime,Open,High,Low,Close,Volume`, UTC, mid).
+
+**Checkpoint:** awaiting user OK on the branch/commit proposal before any code change.
+**Resolved:** user approved; branch `execution/phase-a` created, commit `e6bc8ad`
+(plan docs + EXECUTION_LOG + `.gitignore`). `.venv/` confirmed untracked.
+
+---
+
+## Task 1 — Phase 0a smoke-test on real data  ✅ (2026-07-01)
+
+**Goal:** prove the single-split pipeline trains end-to-end on data we already have —
+**plumbing only, performance NOT interpreted** (doc 04 §6 track 0a).
+
+**How:** `smoke_test.py` uses runtime `CFG` overrides and leaves `config.py` untouched
+— a deliberate, reversible deviation from "edit config.py" so no smoke settings leak
+into the committed baseline. Data copied to `data/XAU_USD_M1.csv` (gitignored).
+Settings: `time_col="DateTime"`, `source_tz="UTC"`, `timestamp_is_bar_open=True`,
+`max_days_for_demo=365`, exec=1min / decision=H1 (defaults). Ran
+`train_ppo.train(total_timesteps=5000, train_episode_steps=1024, eval_freq=2000,
+n_envs=1, device="cpu", out_dir="models/smoke", reveal_test=False)`.
+
+**Result — PASS (exit 0; no errors, no deprecation/API-drift warnings):**
+- Data: M1 **353,495** rows [2025-06-11 → 2026-06-11], UTC → resampled to
+  **5,666 H1** feature bars [2025-06-26 → 2026-06-11].
+- Features: **25** exactly, **0 NaN / 0 inf** — matches the documented set.
+- PPO trained (5,120 steps, ~1,600 fps); VecNormalize + consistency callback ran;
+  **best checkpoint saved at 2,000 steps** (eligible: train_r +4.05 / val_r +2.54);
+  `run_info.json` correctly pairs the best model ↔ `best_model_vecnorm.pkl`.
+- Post-training eval produced train/val trade logs + an equity HTML; test kept sealed.
+- Artifacts in `models/smoke/` (gitignored): model `.zip`, vecnorm `.pkl`, equity
+  `.html`, `run_info.json`, `eval_logs/consistency_evals.csv`, `best_model/`.
+
+**Performance NOT interpreted** — 5k steps is untrained; the −7.7% train / +0.7% val
+returns are noise, recorded only to prove the eval path runs.
+
+**Version watch-item RESOLVED:** repo code runs unmodified on gymnasium 1.1.1 /
+sb3 2.7.1 / numpy 2.0.2 / torch 2.8.0 — no API drift.
+
+**Incidental (doc 01, NOT fixed — Task 2 scope):** the duplicate + mojibake post-eval
+print (B5) reproduced verbatim. B1–B3 untouched.
+
+**New deliverable (uncommitted, pending OK):** `smoke_test.py`.
+
+---
+
+## Interlude — skeptical re-review + doc 05 addendum  ✅ (2026-07-01, no code changes)
+
+Between Task 1 and Task 2 the user requested an adversarial review of the whole
+plan + code. Every doc-01 claim was re-verified against live source (B1/B2/B3
+confirmed; B3 found narrower than documented — `final_holdout_eval.py:92-95` pairs
+correctly, the mismatch is notebook-only). The installed SB3 2.7.1 was traced for
+env-dependent behavior, and a **gap census** ran on the real LEAN CSV (pure pandas):
+183 weekend reopens in 3.5y, median gap 0.33×ATR(H1), 90th pct 1.35×ATR, max
+4.3×ATR; 44 gaps > 1×ATR total.
+
+**Output:** `05-review-addendum-and-perception-audit.md` — missed items N1–N8
+(headline: N1 gap-through-SL fills; N2 zero-obs truncation bootstrap verified in
+SB3 source; N3 gate doesn't scale to ~34 folds; N7 portfolio risk overlay) plus a
+perception/learning-flow audit yielding feature candidates P1–P9 (range position,
+observable cost, M1 microstructure, gap awareness, retrain-cadence sweep) with a
+batch discipline. Items merged into doc 04's phases (05 §4), doc 02 §8–§9, README
+index/status refreshed (env note was stale — stack now runs).
+
+**Plan impact:** none to ordering — Task 2 (B1–B3) unchanged. Two new open
+decisions added to doc 04 §5 (N1 sequencing; P9 calendar source).
+
+---
+
+## Task 2a — B1 fix: the deploy gate now gates  ✅ (2026-07-01)
+
+**Re-verified against live source before editing:** `_finalize_deployment` always
+promotes and records `gate_passed` (`train_ppo.py:747,751-755`); grep confirmed
+**zero readers** of the flag in `final_holdout_eval.py`, `training_diagnostics.py`,
+or the notebooks. `test_analysis.ipynb`'s stored outputs even show a real
+`gate_passed: False` run analyzed silently (Test +70% reported for a non-approved
+model) — the bug had already bitten in production use.
+
+**Fix (blocked-by-default, explicit override — never silent either way):**
+- `model_artifacts.py` — new `check_gate_approval()` shared guard: key absent
+  (no gate ran, e.g. single-split) → proceed; `true` → proceed; `false` → loud
+  banner + `SystemExit(2)`, unless explicitly overridden → proceed with loud
+  warning.
+- `final_holdout_eval.py` — guard fires immediately after `load_run_info`,
+  BEFORE the sealed holdout is revealed; new `--allow-failed-gate` CLI flag.
+- `training_diagnostics.py` — guard at the production-model load in section [3];
+  new `allow_failed_gate` param + `--allow-failed-gate` CLI flag (SystemExit
+  propagates past the section's `except (FileNotFoundError, KeyError)`).
+- `notebooks/test_analysis.ipynb` (cell `853a550e`) — `ALLOW_FAILED_GATE = False`
+  constant + `RuntimeError` guard right after `run_info` load.
+
+**Repro (`checks/check_b1_gate_guard.py`) — ALL PASS:** unit semantics (4 cases);
+end-to-end: fabricated `gate_passed:false` run_info against `models/smoke/`
+fixtures → `final_holdout_eval.py` exits 2 with BLOCKED banner; with
+`--allow-failed-gate` it warns loudly and proceeds past the guard (then stops at
+the absent default CSV — a different failure, proving the guard released).
+Fixture auto-removed; refuses to overwrite a real `models/run_info.json`.
+
+**Measurement-only:** touches only reporting/eval surfaces; no training code
+path. On the default sliding path, behavior changes only when a run's gate
+FAILED — which is the fix, not a regression. Trained weights unaffected.
+
+---
+
+## Task 2b — B2 fix: block walk-forward scores the deployable pair  ✅ (2026-07-01)
+
+**Re-verified against live source:** `train_walk_forward` bound the FINAL
+in-memory model from `train()` (`train_ppo.py:837`) yet loaded the BEST
+checkpoint's vecnorm (`train_ppo.py:852-856`), then fed that mismatched pair to
+`evaluate_on_split` → the per-fold summary AND the deployment gate
+(`train_ppo.py:899`). The sliding path's `_load_fold_model` was already correct.
+
+**Fix:** the fold evaluation now loads the deployable pair via
+`_load_fold_model(fold_dir)` — best (eligible) checkpoint + its own
+`best_model_vecnorm.pkl`, falling back to the final pair only when no best
+exists — mirroring the sliding path. `train()`'s return value is no longer
+bound; the manual path reconstruction is gone.
+
+**Repro (`checks/check_b2_vecnorm_pairing.py`) — ALL PASS**, using
+`models/smoke/` as a fold fixture (no training run): (1) `_load_fold_model`
+returns weights tensor-equal to `best_model.zip` and different from the final
+model, paired with the best checkpoint's own vecnorm path; (2) static — the
+walk-forward body uses `_load_fold_model` and the old mismatched binding is gone.
+
+**Measurement-only:** the diff is confined to the post-training evaluation block
+inside `train_walk_forward` (after `train()` returns). The training loop is
+untouched; the default sliding path never executes this code. Per-fold summary
+numbers and the gate decision on the BLOCK scheme may legitimately change —
+they now measure the model that would actually ship (that is the fix).
+
+---
+
+## Task 2c — B3 fix: notebook pairs best checkpoint with its own vecnorm  ✅ (2026-07-01)
+
+**Re-verified against live source:** `test_analysis.ipynb` cell `b8bbe8e7` ran all
+three BEST_VAL evaluations with `VECNORM_PATH` (the FINAL model's normalization);
+`test_analysis_folds.ipynb` already used `BEST_VECNORM_PATH` correctly — the fix
+was never backported (doc 01 B3). Obs stats drift across training, so the final
+stats mis-normalize the earlier best checkpoint — the notebook's stored headline
+numbers (best-val Test +70%) were computed under the wrong normalization.
+
+**Fix (mirrors the folds notebook):** cell `b8bbe8e7` now defines
+`BEST_VECNORM_PATH = run_info.get('best_model_vecnorm_path', models/best_model/
+best_model_vecnorm.pkl)` and the three `bv_*` calls pass it; `FINAL_MODEL` keeps
+`VECNORM_PATH` (its own stats). Everything else in the cell is unchanged.
+
+**Repro (`checks/check_b3_notebook_pairing.py`) — ALL PASS:** static JSON parse
+asserts best↔best-vecnorm and final↔final-vecnorm in BOTH notebooks (the folds
+notebook doubles as the reference invariant, so a future regression in either
+gets caught).
+
+**Regression sweep after all three fixes:** B1 checks re-pass (same notebook
+edited twice), B2 checks pass, and `smoke_test.py` re-ran end-to-end with
+exit 0 — the training path is byte-identical in behavior (B1/B3 never touch it;
+B2's diff is post-training only).
+
+**Phase-A checkpoint:** B1–B3 complete (commits `ba948c9`, `7a4c3c2`, `e980627`).
+User signed off; decisions ratified: N1 lands in Phase A; N3 goes
+fraction/quantile (params to be proposed); push branch for backup.
+
+---
+
+## Task 3a — N1 fix: honest gap-through-SL fills  ✅ (2026-07-01)
+
+**Change (training-affecting BY DESIGN — the honest anchor):** the M1 fill sim
+filled SL at the bracket price even when the bar OPENED beyond it
+(`env_bracket.py:252` pre-fix), and pre-extracted only High/Low
+(`env_bracket.py:83-85` pre-fix). Now: `self._m1_open` is pre-extracted, each M1
+bar checks the open first — long SL fills at `min(open, sl)`, short at
+`max(open, sl)` — and the gapped price flows into `_close_position` (spread/
+slippage logic unchanged). Gap fills are tagged `exit_reason="SL_gap"`. TP still
+fills AT the TP price even on a favorable gap (house pessimism, mirrors
+SL-first).
+
+**Verification (`checks/check_n1_gap_fills.py`) — ALL PASS:**
+- Synthetic gap bars, zero costs → exact R arithmetic: long gap −3R (was −1R),
+  short gap −3R, normal SL −1R unchanged, favorable TP gap +1R (not +2R),
+  both-hit gap bar → SL-first preserved at the gapped fill.
+- Census replay on the real smoke window (365d, always-long + always-short
+  scripted passes, 1×ATR stops): **11 SL_gap fills, every one verified
+  fill-at-open net of costs; ≈11.6R total was previously under-booked
+  (≈1.05R extra loss per gap event)** — the old model flattered exactly as
+  doc 05 N1 predicted.
+
+**Impact:** all future training/backtests price gap risk; numbers are NOT
+comparable to pre-N1 runs (intended — that is the point of fixing the ruler
+before the Phase-B baseline).
+
+---
+
+## Task 3b — MTM equity + trade-based Sharpe (doc 03 §3.9a/b)  ✅ (2026-07-01)
+
+**Changes:**
+- `env_bracket.py` — history now records `equity_mtm` (realized + open-position
+  unrealized, marked at the bar close) beside the realized-only `equity`.
+- `evaluate.py` — `max_drawdown_mtm_pct` in `summarize_equity`; new
+  `trade_based_sharpe()` (mean/std of per-trade R × √(annual trade rate)),
+  reported as `sharpe_trade` in `full_report`. Legacy `sharpe_like` retained
+  for continuity until the metric pin (task 5) is ratified.
+- `train_ppo.py` — **checkpoint selection now uses MTM drawdown**
+  (`_run_one_episode` picks `equity_mtm` when present — part of the honest
+  ruler: selection must not be flattered by realized-only DD); sliding/block
+  summary rows gain `*_sharpe_trade` + `*_max_dd_mtm_pct`; the stitched OOS
+  curve now carries a chained `equity_mtm` column and the stitched report
+  prints both DDs + trade-Sharpe.
+
+**Verification (`checks/check_mtm_equity.py`) — ALL PASS:**
+- Synthetic dip-then-TP trade: realized DD **0.00%** (the old flattering
+  number) vs MTM DD **−0.40%** — exact to construction.
+- `trade_based_sharpe` arithmetic vs hand-computed value; NaN guards (<2 trades).
+- Real measurement (smoke best model on its val split, 33 trades): realized
+  maxDD **−1.55%** vs MTM **−1.87%** — a 0.32pp understatement even on this
+  tiny fixture; the gap grows with hold time and position count.
+
+**Note:** selection-behavior change (MTM DD in the consistency score) is an
+intended ruler change; trained weights are unaffected (eval-side only). H1-close
+marks still miss intra-bar extremes — doc 05 records this as a lower bound.
+
+---
+
+## Task 3c — Multi-seed evaluation harness  ✅ (2026-07-01)
+
+`eval_harness.py`: `multi_seed_run(run_fn, seeds)` → per-seed frame +
+median/IQR/range; gate failures counted and warned LOUDLY but kept in the
+distribution (hiding them would bias comparisons). Provisional metric helper
+`metric_return_over_mtm_dd` (marked PROVISIONAL pending the task-5 pin).
+Default seeds (42–46); cheap ranking = first 3, finalists = 5.
+
+**Verified (`checks/check_multi_seed_harness.py`) — ALL PASS:** synthetic
+distribution arithmetic exact (median/quartiles/warning/KeyError); real
+integration — two 3k-step trainings on smoke data → deterministic val rollouts
+→ distribution (median +0.872, range [+0.425, +1.320] across just 2 seeds of an
+identical config — the seed-variance evidence that motivates the harness).
+
+---
+
+## Task 3d — Lockbox-carve mechanism  ✅ (2026-07-01)
+
+`config.py` gains `lockbox_start_date` (default None — the concrete date gets
+pinned when the Dukascopy backbone lands); `make_sliding_folds` gains
+`lockbox_start` and truncates the frame BEFORE any fold is cut, so no train/
+val/test window can ever touch the reserved tail; `train_sliding_walk_forward`
+passes `CFG.lockbox_start_date` and announces an active lockbox loudly.
+
+**Verified (`checks/check_lockbox_carve.py`) — ALL PASS**, naive + tz-aware:
+without carve the sweep reaches past the cut; with carve every window ends
+strictly before it, folds equal the pre-truncated-frame result (equivalence),
+and `None` is a proven no-op.
+
+**Regression sweep after all Phase-A changes:** all six check scripts
+(B1/B2/B3/N1/MTM/lockbox) pass together.
+
+---
+
+## Phase-A checkpoint 2 — awaiting reviewer sign-off (2026-07-01)
+
+DONE: N1 honest fills, MTM equity + trade-Sharpe, multi-seed harness, lockbox
+carve (4 commits). PROPOSED, NOT IMPLEMENTED (pin-by-reasoning rule):
+- **N3 gate re-form params** — proposal in the checkpoint report: breadth
+  `min_consistent_fold_frac = 0.70` (reproduces the old 4-of-5 exactly at n=5;
+  ≈0.8% luck-pass probability under a no-edge null at n=34) + PF floor at the
+  **10th percentile ≥ 0.90** (matches old worst-of-5 semantics at n=5;
+  tolerates ~3 bad folds of 34) + mean trade-Sharpe > 0 once the metric pin
+  lands. Awaiting sign-off.
+- **Primary metric + ship threshold** — proposal: median across 5 seeds of
+  stitched-OOS return ÷ |stitched MTM maxDD|; ship on ≥ +10% relative median
+  improvement with ≥4/5 seed-consistency and no gate regression. Awaiting
+  sign-off.
+Phase B (baseline) remains blocked on the 0b Dukascopy backbone + these pins.
+
+---
+
+## Task 4a — N3 gate landed + both pins RATIFIED  ✅ (2026-07-01) — PHASE A CLOSED
+
+Reviewer ratified both proposals (with adjustments: trade-based Sharpe as the
+gate's third leg; a path-based DD secondary added to the metric; the +10%
+margin marked provisional with exactly one noise-calibrated adjustment).
+
+**Gate (implemented, `config.py` + `train_ppo.py`):** breadth
+`min_consistent_fold_frac = 0.70` (return>0 AND PF>1; `ceil(0.70×5)=4`
+reproduces the old block-scheme 4-of-5), floor = 10th-percentile fold PF ≥
+0.90, third leg = mean **trade-based** Sharpe > 0 (`val/test_sharpe_trade`).
+Old absolute knobs (`min_consistent_folds`, `gate_worst_fold_min_pf`) removed;
+grep confirms no stale references. Stale D2 comment in the config block fixed
+in passing (it claimed `run_info.NO_DEPLOY.json`; reality = `NO_DEPLOY.txt` +
+`gate_passed`).
+> **Discipline (verbatim):** a sound gate rejecting the baseline is a RESULT,
+> not a trigger to loosen; re-pin only for mechanical mis-specification, never
+> to make a result pass.
+
+**Metric (recorded; supporting metrics implemented):** primary = median-of-5 of
+(stitched-OOS return ÷ |stitched-OOS max MTM DD|); ALSO report a path-based DD
+(Ulcer / return-over-avg-DD) as a non-gating secondary — implemented as
+`ulcer_index_mtm` in `evaluate.py`; ship rule = ≥+10% relative AND ≥4/5 seeds
+beat running-best median AND no gate regression; 3 seeds rank / 5 finalists.
+The +10% margin is PROVISIONAL — reserve ONE recalibration against the
+baseline's measured seed-IQR, once, before any Phase-C A/B (calibrating to
+noise, not outcome).
+
+**Verification (`checks/check_n3_gate_reform.py`) — ALL PASS:**
+- n=5: 4-of-5 passes / 3-of-5 fails (old breadth reproduced exactly); one
+  catastrophic fold (PF 0.5) fails the floor; negative mean trade-Sharpe fails.
+  Documented divergence: worst-fold PF 0.85 now PASSES the floor (q10 blends to
+  0.97) where the old worst-fold rule failed — accepted when ratifying the
+  quantile form (smoothing at tiny n).
+- n=34: breadth needs 24 (was: 4, trivial); floor tolerates 3 catastrophic
+  folds and rejects 4 (was: one bad fold vetoed all 34); NaN (no-trade) folds
+  skipped, not zero-treated.
+- Ulcer arithmetic exact (flat→0; [100,90,100]→√(100/3)%).
+
+**PHASE A COMPLETE.** The ruler: honest gate honored downstream (B1), honest
+pairing (B2/B3), honest fills (N1), honest risk (MTM DD + trade-Sharpe +
+Ulcer), fold-count-invariant gate (N3), multi-seed harness, lockbox mechanism,
+and both pins recorded. Next: 0b Dukascopy backbone (critical path) → Phase B
+baseline under this ruler.
+
+---
+
+## Task 5 — 0b Dukascopy backbone acquired + validated  ✅ (2026-07-02)
+
+**Deliverable:** `data/XAUUSD_M1_Bid_Dukascopy_2003.05.05_2026.07.02.csv` —
+**7,851,188 M1 rows, 23.2 years, 574 MB, BID** (repo's RL-default stream;
+gitignored, as are the per-year raw chunks in `data/dukascopy_raw/`).
+
+**How:** `dukascopy-node` (Node 22; validated first on one week vs OANDA before
+the full pull), resumable per-year chunks with cache+retries. Two per-year
+artifacts came down PARTIAL on the first pass (2014 truncated at Jan-10, 2018
+at Jan-19 — non-empty files that would have silently passed a size-only check;
+caught by a full per-chunk coverage sweep) and two years initially failed
+outright; direct CDN probes proved the server HAS all 2014–2015 days (HTTP 200
+each), so the failures were client/CDN throttling — resolved with patient
+retries + `--no-fail-after-retries` + smaller batches. Final sweep: all 24 bid
++ 4 ask chunks healthy, ~310 trading days/yr, no non-calendar gaps.
+
+**Conversion:** `convert_dukascopy_to_lean.py` (committed) — epoch-ms UTC →
+LEAN convention (`DateTime,Open,High,Low,Close,Volume`, UTC, bar-open), 0
+duplicate timestamps. Drops into the loader with `time_col="DateTime"`,
+`source_tz="UTC"`, `timestamp_is_bar_open=True`.
+
+**Validation (`checks/check_backbone_data.py`, committed) — ALL HARD GATES PASS:**
+1. **Splice vs OANDA** (2023-01-02→2026-06-11, n=1,213,082 common bars):
+   Dukascopy-mid vs OANDA-mid median |diff| = **0.025** (median spread 0.410 —
+   16× inside), systematic offset **+0.0000**, p99 = 0.257. Like-for-like,
+   agree well within spread → stitching approved.
+2. **Timezone/alignment:** lag-sweep minimum at lag 0 (0.025 vs ~2.5–3.5 at
+   ±60/120min) — no DST/offset bug.
+3. **N6 volume comparability: REJECT.** Full-window Spearman = **0.694** <
+   0.70 pre-set bar (a one-week sample read 0.865 — flattering; the full
+   window is the honest number). **Verdict: volume features are REJECTED —
+   nothing downstream may use cross-vendor Volume as a feature (doc 05 N6).**
+4. **Loads + leakage:** full backbone → 139,611 H1 bars → **25 features,
+   0 NaN/0 inf**; `leakage_checks` guardrail PASS.
+5. **Census:** 2003 sparse (197 days, ~40% density), 2004–2005 ramping,
+   **2006→2026 fully dense** (333–365k bars/yr, 309–313 days/yr, longest gaps
+   = weekend/holiday only). **Recommended clean start: 2006-01-01 → 20.5
+   dense years → ~28–30 sliding folds** (2003–2005 kept in the file but
+   flagged density-degraded; sparse M1 mainly coarsens fill detection, which
+   SL-first renders more pessimistic, not less).
+
+**DoD (doc 04 §1.4): MET** — ≥15y ✓ (20.5y dense / 23.2y total), loads through
+`prepare_feature_frame` ✓, passes `leakage_checks.py` ✓, splice within spread ✓,
+N6 verdict recorded ✓. Phase B is now unblocked on data; config still points at
+the old default CSV — switching `csv_path` (+ pinning the lockbox date) belongs
+to the Phase-B runner, not this chunk.
+
+---
+
+## Task 6 — ATR-relative execution cost (honest-anchor fix)  ✅ (2026-07-02)
+
+**Ratified decision:** cost model → ATR-relative, calibrated from the measured
+0.41 recent OANDA spread. Training-changing (like N1); landed BEFORE the
+baseline so the anchor isn't cost-optimistic.
+
+**Pinned BY MEASUREMENT (never tuned to a result):**
+`spread_atr_frac = 0.41 / 6.586 = 0.0623`, `slippage_atr_frac = 0.02 / 6.586 =
+0.0030`, where 0.41 = median OANDA spread over 2023–2026 (0b splice census) and
+6.586 = median H1 ATR(14) over the SAME window, computed from the backbone.
+
+**Why (measured era table):** the old fixed 0.20 spread charged **7.7% of ATR
+in 2006 but 0.9% in 2026** (8× regime distortion) and, at the real 0.41 recent
+spread, **undercharged the recent era ~2×**. ATR-relative keeps cost
+dimensionless (features/reward/brackets already are; doc-02/05 multi-instrument
+direction) and makes cost-per-R depend only on the SL bucket:
+**1R TP now nets a constant 0.96585R; SL loses 1.03415R — every era.**
+
+**Changes:** `env_bracket.py` — `spread_atr_frac`/`slippage_atr_frac` params,
+`_half_cost(atr)`, both legs priced at the trade's **entry-bar ATR** (stored as
+`Position.entry_atr`, also logged per-trade); `config.py` — knobs + calibration
+provenance (absolutes deprecated/removed); pass-throughs updated in
+`train_ppo.build_env` + `run_info`, `run_pipeline.py`, all 3 notebooks (5 env
+cells), and the zero-cost fixtures in checks (N1 census math now prices
+expected fills at per-trade `entry_atr`). Parameter RENAME on purpose: stale
+call sites fail loudly instead of silently keeping absolute semantics.
+
+**Verified (`checks/check_atr_cost.py`) — ALL PASS:** hand-exact charge at a
+known ATR; **regime independence** (identical R at ATR=2 and ATR=20);
+calibration figures (0.96585R / −1.03415R); **entry-ATR pinning** (mid-trade
+ATR spike does not re-price the exit). Full regression sweep: all 7 prior
+checks + end-to-end smoke train green under the new model.
+
+**Impact:** pre/post-ATR-cost numbers are NOT comparable (intended). The
+doc-05 P2 companion (making cost OBSERVABLE to the agent) remains a Phase-C
+item — this task changes what the sim charges, not what the agent sees.
+
+---
+
+## Task 7 — Phase B setup: registry, config switch, sizing run  ✅ (2026-07-03)
+
+**B.0 run registry (`0d8bfc8`):** `runs/<stamp>_<gitsha7>_<label>/` with
+`registry.json` (git SHA incl. `-dirty` flag, data name+SHA256+span, full CFG
+snapshot, seeds, results); committed `runs/INDEX.md` = one line per run + the
+"running best" pointer that moves ONLY via the ratified ship rule. Stamp is
+second-resolution (crash-retries/multi-seed days must never collide — learned
+from the first sizing attempt). Self-test green.
+
+**Config switch (`033e779`):** production dataset = the 0b backbone;
+`start_date=2006-01-01` (census clean start); **lockbox pinned 2024-07-01**
+(ratified: final 24 months). Guard `checks/check_phaseb_config.py`: 7.26M M1
+rows load via CFG, **25 folds** (vs 29 unlocked — the earlier ~28-30 was
+pre-lockbox arithmetic), zero lockbox contact, first train 2006-01-16. Note:
+fold geometry leaves a ~5.5-month untested strip (2024-01→2024-07) before the
+lockbox — full-test-window requirement, not a bug.
+
+**Sizing run (registry entry #1, label `sizing-run`, fold 25/25 = train
+2018→2023, TEST 2023-07→2024-01, seed 42, 3M steps, n_envs=4):**
+- First attempt FAILED: driver lacked the `__main__` guard that
+  `train_ppo.py` documents as required for `n_envs>1` (SubprocVecEnv worker
+  bootstrap re-executed the script → FileExistsError + BrokenPipeError).
+  Fixed; the future baseline launcher inherits the guard.
+- **Timing: 14.1 min train (3,545 env-steps/s), eval ~1s, data load ~8s →
+  ~15 min per fold-seed.** Full baseline = 125 fold-seeds ≈ **31h
+  sequential**; 3-seed provisional ≈ 19h; 16 logical/12 perf cores allow
+  ~2 concurrent jobs (≈17h / ≈10h).
+- **Metric + gate emission verified end-to-end** on real data: per-fold
+  metric +2.71 (test ret +8.57%, PF 1.27, trade-Sharpe +2.01, MTM DD −3.16%,
+  Ulcer 1.26, 202 trades); N3 gate detail lines emitted; registry finalized.
+- **⚠ HONEST-RULER FINDING (one fold, one seed — a flag, not a conclusion):**
+  across all 20 evaluations, **zero checkpoints were eligible** — the val leg
+  was negative at every eval (−1.4R to −43R). `best_model/` was therefore
+  never saved and the test result came from the FINAL (unselected) checkpoint
+  via the documented fallback. Under the honest ruler (ATR costs + gap fills
+  + MTM DD), this fold shows no exploitable val-period edge; the +8.57% test
+  is consistent with a long-lean into a rising test window. Implications:
+  (a) do NOT trim the 3M budget on "plateau" grounds — there was no
+  learning-curve plateau to exploit, and no evidence 3M over-trains;
+  (b) the baseline distribution may be far weaker than the old flattering
+  numbers suggested — which is exactly what the ruler was built to reveal;
+  (c) folds with zero eligible checkpoints contribute their final model to
+  the stitched OOS (system-as-is behavior; the baseline measures it as such).
+
+**PROPOSED COMPUTE PLAN (awaiting sign-off — no full run launched):**
+3-seed provisional anchor first (75 fold-seeds, ~19h sequential / ~10h at
+2-way concurrency), evaluate the never-eligible pattern across folds, then
+extend to 5 seeds (+50 fold-seeds) for the ratified metric. Keep 3M
+steps/fold. Background job-pool launcher with per-job registry logging.
+
+---
+
+## Task 8 — 3-seed provisional baseline: PRE-DECLARATION + LAUNCH (2026-07-03)
+
+**APPROVED** by reviewer with binding additions, recorded BEFORE launch:
+
+1. **Seeds pre-declared:** the ratified 5-seed set is **{42, 43, 44, 45, 46}**;
+   this provisional pass runs the first three **{42, 43, 44}**; the extension
+   (on sign-off) adds **{45, 46}** to the SAME parent run. The extension can
+   never be seed-picked — the set is fixed here, in advance, and recorded in
+   the parent registry entry (`ratified_seed_set`).
+2. **Anchor discipline (absolute):** no config, hyperparameter, cost,
+   eligibility, or gate changes in response to anything seen during or after
+   this run. Observations land in the Phase-C candidates list below — nothing
+   else. The baseline measures the system as-is.
+3. **Registry:** parent entry `baseline-3seed` + one job record per fold-seed
+   (`jobs/fKK_sSEED/job.json` + crash-safe DONE marker; resumable pool —
+   interpretation note: per-job entries live as structured job records inside
+   the parent so INDEX.md keeps one line per run). The completed baseline
+   **initializes the running-best pointer by definition**; `gate_passed`
+   records deployability separately — a gate-FAIL baseline is still the anchor.
+4. **Per-seed outputs:** stitched OOS curve (equity+MTM), N3 gate verdict +
+   detail, pinned metric — labeled **median-of-3 PROVISIONAL** (the ratified
+   metric requires 5 seeds).
+5. **Diagnostics to report:** eligibility fraction + per-fold map; train/val
+   sign patterns across all evals; churn (trades/window, exit-reason mix incl.
+   SL_gap); per-fold metric distribution + seed-IQR (feeds the reserved
+   ONE-TIME +10%-margin recalibration — flag only, never recalibrate
+   unilaterally); wall-clock vs the ~10h estimate.
+
+**Launcher:** `run_baseline.py` (committed) — resumable fold×seed subprocess
+pool (2 concurrent × n_envs=4, OMP/MKL threads capped at 2/job as compute
+plumbing), per-job provenance, aggregation + diagnostics + INDEX/running-best
+updates. Mini-tested end-to-end (2 folds × 2 seeds × 6k steps: pool, crash
+markers, resume-skip, aggregation, gate emission, report, INDEX/running-best —
+then fully cleaned up and INDEX restored; one ordering bug found+fixed by the
+mini test, which is why it exists).
+
+### PR #1 review triage (2026-07-03, mid-baseline — verified before believing)
+
+Copilot raised 3 findings; each was re-verified against live code assuming it
+was wrong. Governing constraint: newly spawned pool jobs re-execute
+`run_baseline.py` FROM DISK, so mid-run edits to it would make later jobs run
+code differing from the `b9bc9d6` sha in the run's provenance — that file is
+frozen until the pool finishes.
+
+- **F1 (fd "leak" in `manage()`): severity claim REFUTED.** CPython refcounting
+  closes each parent-side log handle when `log` rebinds on the next launch
+  (Popen dups the fd for the child and retains no reference) — steady-state
+  parent handles ≈ 1, not 75; no OS-limit risk. The `with`-block IS better
+  style → **deferred** to the post-run launcher touch (never edit the live
+  launcher mid-run for cosmetics).
+- **F2 (duplicate `import pandas` in `_stitch`): VERIFIED, cosmetic.** Same
+  file, same freeze → **deferred**, batched with F1.
+- **F3 (`smoke_test.py` executes at import): VERIFIED, REAL, FIXED NOW.**
+  Module-level CFG mutation + training, and the filename matches pytest's
+  `*_test.py` collection pattern — future test collection would silently start
+  a training run. Everything moved into `main()` behind the `__main__` guard
+  (same discipline the sizing failure taught). Verified: import is 1ms with
+  zero side effects, CFG untouched. The file is uninvolved in the pool's job
+  path — **zero impact on the running baseline**. Full smoke re-run deferred
+  to the post-baseline sweep (re-running now would churn the models/smoke
+  fixtures the B1/B2 checks use, mid-flight, for no information).
+
+### Phase-C candidates list (observations only — nothing changes now)
+- (from sizing) Never-eligible folds fall back to the FINAL checkpoint —
+  consider whether fold-level "no eligible checkpoint" should be surfaced as
+  its own diagnostic/gate leg in Phase C. (doc 03 §3.8 territory.)
+- (from sizing) Both-legs-negative eval pattern under the honest ruler —
+  candidate revisit of reward/selection interplay (doc 03 §3.4b) AFTER the
+  anchor exists.
+

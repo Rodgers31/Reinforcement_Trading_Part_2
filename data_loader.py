@@ -236,6 +236,7 @@ def make_sliding_folds(
     test_months: int = 6,
     step_months: int = 6,
     embargo_bars: int = 200,
+    lockbox_start: str | pd.Timestamp | None = None,
 ):
     """Rolling train / val / test walk-forward with calendar-sized windows.
 
@@ -253,6 +254,11 @@ def make_sliding_folds(
     ``embargo_bars`` are purged at the START of the val and test windows so the
     EWM-based features there cannot straddle a boundary into the previous segment.
 
+    ``lockbox_start`` (doc 04 Phase A) carves a FINAL LOCKBOX: all bars at/after
+    this timestamp are excluded from the sweep entirely — no fold's train, val,
+    or test window can touch them.  The lockbox is revealed once, for the single
+    final system (doc 03 §7 "seal the test, reveal once" discipline).
+
     Returns
     -------
     list[tuple[DataFrame, DataFrame, DataFrame]]
@@ -262,6 +268,14 @@ def make_sliding_folds(
     """
     if df.empty:
         return []
+
+    if lockbox_start is not None:
+        cut = pd.Timestamp(lockbox_start)
+        if cut.tz is None and df.index.tz is not None:
+            cut = cut.tz_localize(df.index.tz)
+        df = df.loc[df.index < cut]
+        if df.empty:
+            return []
 
     idx = df.index
     start, end = idx.min(), idx.max()

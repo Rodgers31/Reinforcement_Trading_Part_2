@@ -33,20 +33,15 @@ _BARS_PER_YEAR: dict[str, int] = {
 
 @dataclass
 class ProjectConfig:
-    # Path to your full MT4/MT5-style minute CSV.
-    # Long Bid file (May 2003 – May 2026, ~23 years) — primary dataset: enough
-    # history for several walk-forward folds plus a multi-year sealed test.
-    csv_path: Path = Path("data/XAUUSD_1 Min_Bid_2003.05.05_2026.05.31.csv")
-    # Short Ask file (Jan 2020 – Jan 2026, ~6 years) — kept as a fast smoke-test
-    # dataset; uncomment to fall back to it.
-    #csv_path: Path = Path("data/XAUUSD_1 Min_Ask_2020.01.09_2026.01.15.csv")
-
-    # Your file column is usually exactly "Time (EET)".
-    time_col: str = "Time (EET)"
-
-    # Many brokers call this EET but actually follow EET/EEST server time.
-    # Europe/Helsinki is a practical EET/EEST timezone choice.
-    source_tz: str = "Europe/Helsinki"
+    # ── Production dataset (switched 2026-07-02, Phase B) ────────────────────
+    # Dukascopy XAUUSD M1 BID backbone, 2003-05-05 → 2026-07-02 (7.85M rows),
+    # acquired + validated on the 0b track (see enhancements/EXECUTION_LOG.md):
+    # splice vs OANDA within spread (median |mid diff| 0.025 vs 0.410 spread),
+    # lag-0 aligned, 25 features 0 NaN/inf, leakage guardrail PASS.
+    # LEAN convention: DateTime,O,H,L,C,V; UTC; bar-open stamps.
+    csv_path: Path = Path("data/XAUUSD_M1_Bid_Dukascopy_2003.05.05_2026.07.02.csv")
+    time_col: str = "DateTime"
+    source_tz: str = "UTC"
 
     # MT4/MT5-style M1 exports usually timestamp each row at candle OPEN.
     # Internally the project indexes bars by CLOSE time so a decision timestamp
@@ -63,7 +58,10 @@ class ProjectConfig:
     # 90 days ≈ 25 K M5 bars / ~2 K H1 bars. Enough for pipeline smoke-tests
     # but too small for a publishable result.
     max_days_for_demo: Optional[int] = None
-    start_date: Optional[str] = None
+    # 0b census: 2003 is sparse (~40% density) and 2004-05 ramp; the backbone
+    # is fully dense from 2006 (333-365k bars/yr). Training universe starts
+    # at the clean start so fill simulation quality is uniform.
+    start_date: Optional[str] = "2006-01-01"
     end_date: Optional[str] = None
 
     # ── Validation scheme ────────────────────────────────────────────────────
@@ -112,16 +110,43 @@ class ProjectConfig:
     sliding_test_months: int = 6
     sliding_step_months: int = 6
 
-    # ── Walk-forward deployment gate ─────────────────────────────────────────
+    # ── Final lockbox (Phase E) ──────────────────────────────────────────────
+    # Tail period excluded from the ENTIRE sliding walk-forward sweep — no fold
+    # (train, val, or test) may touch bars at/after this date, so iterating on
+    # the dev surface can never contaminate it (doc 03 §7, doc 04 Phase A/E).
+    # The concrete date gets pinned when the deep Dukascopy backbone lands;
+    # it is revealed ONCE, for the single final chosen system.
+    # Format "YYYY-MM-DD" (naive dates are localized to the data's timezone).
+    # PINNED 2026-07-02 (ratified): final 24 months reserved — the sweep ends
+    # at 2024-07-01; everything after is the one-time Phase-E reveal.
+    lockbox_start_date: Optional[str] = "2024-07-01"
+
+    # ── Walk-forward deployment gate (re-formed 2026-07-01, doc 05 N3) ───────
     # After the folds finish, the final fold is promoted to the production slot
-    # (models/) ONLY if the out-of-sample folds are consistently good. Otherwise
-    # nothing ships: the artifacts stay quarantined under models/walk_forward/
-    # and any stale models/run_info.json is set aside as run_info.NO_DEPLOY.json.
-    # The gate only ever PREVENTS a bad deploy — it never fabricates one.
-    min_consistent_folds: int = 4              # folds needing return>0 AND PF>gate_min_profit_factor
-    gate_min_profit_factor: float = 1.0        # a fold "passes" when its val PF exceeds this
-    gate_worst_fold_min_pf: float = 0.9        # AND no single fold's val PF may fall below this
-    gate_require_mean_sharpe_positive: bool = True  # AND mean val Sharpe across folds must be > 0
+    # (models/) with run_info["gate_passed"] recording the verdict; on failure a
+    # NO_DEPLOY.txt marker is written and downstream tools refuse to use the
+    # model without an explicit --allow-failed-gate override (doc 01 B1).
+    #
+    # Thresholds are FRACTION/QUANTILE-based so the gate's meaning is invariant
+    # to fold count — the old absolute counts (4 folds; worst-fold PF ≥ 0.9)
+    # were written for the 5-fold block scheme and silently changed meaning at
+    # the sliding default's ~34 folds (breadth became trivial, floor draconian).
+    #
+    # RATIFIED 2026-07-01, pinned by reasoning BEFORE any baseline existed:
+    #   breadth ≥ 70% of folds with return>0 AND PF>gate_min_profit_factor
+    #           (ceil(0.70×5)=4 reproduces the old 4-of-5 at n=5; luck-pass
+    #            probability under a no-edge null at n=34 ≈ 0.8%)
+    #   floor   10th-percentile fold PF ≥ 0.90 (≈ old worst-of-5 semantics at
+    #           n=5; tolerates isolated bad regimes, rejects fat left tails)
+    #   third   mean TRADE-BASED Sharpe > 0 (honest per-trade unit, doc 03 §3.9b)
+    # DISCIPLINE: a sound gate rejecting the baseline is a RESULT, not a trigger
+    # to loosen; re-pin only for mechanical mis-specification, never to make a
+    # result pass.
+    min_consistent_fold_frac: float = 0.70     # breadth: fraction of folds needing return>0 AND PF>gate_min_profit_factor
+    gate_min_profit_factor: float = 1.0        # a fold "passes" when its PF exceeds this
+    gate_pf_floor_quantile: float = 0.10       # the PF floor applies at this quantile across folds
+    gate_pf_floor_value: float = 0.90          # ... and that quantile must be >= this
+    gate_require_mean_sharpe_positive: bool = True  # AND mean trade-Sharpe across folds must be > 0
 
     # Embargo removes bars on each side of every split boundary.
     # EMA-200 (the longest lookback used) retains ~37% of a bar's weight after
@@ -140,8 +165,24 @@ class ProjectConfig:
     # Backtest/account model.
     initial_equity: float = 10_000.0
     risk_fraction: float = 0.005  # 0.5% equity risked per trade.
-    spread_price: float = 0.20    # XAUUSD price units; adjust to your broker.
-    slippage_price: float = 0.02  # XAUUSD price units per side.
+
+    # ── ATR-relative execution cost (2026-07-02, honest-anchor fix) ──────────
+    # Round-trip cost scales with the trade's ENTRY-bar ATR instead of a fixed
+    # absolute price. Why: a fixed 0.20 charged 7.7% of ATR in 2006 but 0.9%
+    # in 2026 (8x regime distortion), and at the REAL measured recent spread
+    # (0.41) it undercharged the recent era ~2x. ATR-relative keeps cost
+    # dimensionless (matches features/reward/brackets and the doc-02/05
+    # multi-instrument direction) and makes cost-per-R depend only on the SL
+    # bucket, never the regime: at SL=1.0xATR a 1R TP nets a constant
+    # 1 - (spread_frac/2 + slip_frac) = 0.9659R.
+    # PINNED BY MEASUREMENT (never tuned to a result):
+    #   spread_atr_frac   = 0.41 / 6.586 = 0.0623
+    #     0.41  = median OANDA XAUUSD spread over 2023-2026 (0b splice census)
+    #     6.586 = median H1 ATR(14) over the SAME 2023-2026 window (backbone)
+    #   slippage_atr_frac = 0.02 / 6.586 = 0.0030 (old recent-era equivalent)
+    # Deprecates the absolute spread_price=0.20 / slippage_price=0.02 knobs.
+    spread_atr_frac: float = 0.0623     # round-trip spread as a fraction of entry ATR
+    slippage_atr_frac: float = 0.0030   # per-side slippage as a fraction of entry ATR
     commission_per_trade: float = 0.01
 
     # Reward shaping.

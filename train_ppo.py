@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import sys
 from copy import deepcopy
@@ -107,8 +108,8 @@ def build_env(decision_df, m1_df, feature_cols, randomize_start: bool = False,
         tp_r_multipliers=CFG.tp_r_multipliers,
         initial_equity=CFG.initial_equity,
         risk_fraction=CFG.risk_fraction,
-        spread_price=CFG.spread_price,
-        slippage_price=CFG.slippage_price,
+        spread_atr_frac=CFG.spread_atr_frac,
+        slippage_atr_frac=CFG.slippage_atr_frac,
         commission_per_trade=CFG.commission_per_trade,
         holding_penalty=CFG.holding_penalty,
         reward_mtm_weight=CFG.reward_mtm_weight,
@@ -217,7 +218,10 @@ class _ConsistencyEvalCallback(BaseCallback):
         capture = venv.venv.envs[0]
         eq = capture.saved_equity
         if eq is not None and not eq.empty and "equity" in eq:
-            max_dd_pct = float(abs(drawdown(eq["equity"].astype(float)).min()) * 100.0)
+            # Honest risk (doc 03 §3.9a): select on MARK-TO-MARKET drawdown when
+            # available — realized-only equity understates intra-trade pain.
+            dd_col = "equity_mtm" if "equity_mtm" in eq.columns else "equity"
+            max_dd_pct = float(abs(drawdown(eq[dd_col].astype(float)).min()) * 100.0)
             n_trades = len(capture.saved_trades) if capture.saved_trades is not None else 0
         else:
             max_dd_pct = 0.0
@@ -494,7 +498,8 @@ def train(
         "seed": seed,
         "dd_penalty": dd_penalty,
         "risk_fraction": CFG.risk_fraction,
-        "spread_price": CFG.spread_price,
+        "spread_atr_frac": CFG.spread_atr_frac,
+        "slippage_atr_frac": CFG.slippage_atr_frac,
     }
     # If the consistency callback saved a best (eligible) checkpoint, record it +
     # its normalisation snapshot so eval/holdout use the SAME checkpoint we'd ship.
@@ -671,15 +676,25 @@ def _passes_consistency_gate(
     summary: pd.DataFrame,
     ret_col: str = "val_return_pct",
     pf_col: str = "val_profit_factor",
-    sharpe_col: str = "val_sharpe",
+    sharpe_col: str = "val_sharpe_trade",
 ) -> tuple[bool, list[str]]:
     """Decide whether the walk-forward folds are consistent enough to deploy.
 
     A strategy that only works on some folds has no robust edge, so the gate
-    requires breadth (enough folds genuinely profitable), a floor (no single
-    fold catastrophic), and a positive mean risk-adjusted result.  Thresholds
-    live in config.py.  Pass ret_col/pf_col/sharpe_col="test_*" to gate on the
-    true out-of-sample test windows (sliding walk-forward) instead of val.
+    requires breadth (a FRACTION of folds genuinely profitable), a floor (the
+    low-quantile fold PF must not be catastrophic), and a positive mean
+    trade-based Sharpe.  Fraction/quantile form (doc 05 N3, ratified
+    2026-07-01) keeps the gate's meaning invariant to fold count: the old
+    absolute counts were written for the 5-fold block scheme and silently
+    changed meaning at the sliding default's ~34 folds.  ceil(0.70×5)=4
+    reproduces the old 4-of-5 breadth exactly at n=5.
+
+    DISCIPLINE: a sound gate rejecting the baseline is a RESULT, not a trigger
+    to loosen; re-pin only for mechanical mis-specification, never to make a
+    result pass.
+
+    Thresholds live in config.py.  Pass ret_col/pf_col/sharpe_col="test_*" to
+    gate on the true out-of-sample test windows (sliding walk-forward).
     """
     n = len(summary)
     ret = summary[ret_col]
@@ -687,23 +702,24 @@ def _passes_consistency_gate(
     sharpe = summary[sharpe_col]
 
     good = int(((ret > 0) & (pf > CFG.gate_min_profit_factor)).sum())
-    worst_pf = float(pf.min())          # NaN folds (no trades) skipped by .min()
+    need_good = int(math.ceil(CFG.min_consistent_fold_frac * n))
+    pf_floor = float(pf.quantile(CFG.gate_pf_floor_quantile))  # NaN folds skipped
     mean_sharpe = float(sharpe.mean())
 
-    c_count = good >= CFG.min_consistent_folds
-    c_worst = worst_pf >= CFG.gate_worst_fold_min_pf
+    c_count = good >= need_good
+    c_floor = pf_floor >= CFG.gate_pf_floor_value
     c_sharpe = (mean_sharpe > 0) if CFG.gate_require_mean_sharpe_positive else True
-    passed = bool(c_count and c_worst and c_sharpe)
+    passed = bool(c_count and c_floor and c_sharpe)
 
     ok = lambda b: "OK  " if b else "FAIL"
     detail = [
         f"[{ok(c_count)}] folds with return>0 & PF>{CFG.gate_min_profit_factor:g}: "
-        f"{good}/{n}  (need >= {CFG.min_consistent_folds})",
-        f"[{ok(c_worst)}] worst-fold val PF: {worst_pf:.2f}  "
-        f"(need >= {CFG.gate_worst_fold_min_pf:g})",
+        f"{good}/{n}  (need >= {need_good} = ceil({CFG.min_consistent_fold_frac:.0%} of {n}))",
+        f"[{ok(c_floor)}] {CFG.gate_pf_floor_quantile:.0%}-quantile fold PF: {pf_floor:.2f}  "
+        f"(need >= {CFG.gate_pf_floor_value:g})",
     ]
     if CFG.gate_require_mean_sharpe_positive:
-        detail.append(f"[{ok(c_sharpe)}] mean val Sharpe: {mean_sharpe:+.2f}  (need > 0)")
+        detail.append(f"[{ok(c_sharpe)}] mean trade-Sharpe: {mean_sharpe:+.2f}  (need > 0)")
     return passed, detail
 
 
@@ -834,7 +850,7 @@ def train_walk_forward(
               f"\n   budget {fold_ts:,} steps (~{passes:.0f} passes), eval every "
               f"{eval_freq_k:,}  → {fold_dir}")
 
-        model, _ = train(
+        train(
             total_timesteps=fold_ts,
             seed=seed,
             out_dir=fold_dir,
@@ -847,13 +863,12 @@ def train_walk_forward(
             datasets=(m1, feature_cols, tr, va, test_feat),
         )
 
-        # Re-evaluate the just-trained fold model on its own (OOS) val window,
-        # preferring the best (eligible) checkpoint + its normalisation snapshot.
-        _, run_info = load_run_info(fold_dir)
-        if "best_model_vecnorm_path" in run_info:
-            vecnorm_path = Path(fold_dir) / "best_model" / "best_model_vecnorm.pkl"
-        else:
-            vecnorm_path = Path(fold_dir) / Path(run_info["vecnorm_path"]).name
+        # Re-evaluate the fold's DEPLOYABLE checkpoint on its own (OOS) val
+        # window: the best (eligible) checkpoint paired with ITS OWN VecNormalize
+        # snapshot, exactly like the sliding path does (B2 fix — this previously
+        # scored the FINAL in-memory model under the BEST checkpoint's vecnorm,
+        # a mismatched pair that fed the per-fold summary and the gate).
+        model, vecnorm_path = _load_fold_model(fold_dir)
         rep = evaluate_on_split(model, vecnorm_path, m1, feature_cols, va)
         summary_rows.append({
             "fold": k,
@@ -863,9 +878,11 @@ def train_walk_forward(
             "val_end": va.index.max().date(),
             "val_return_pct": rep.get("total_return_pct"),
             "val_sharpe": rep.get("sharpe_like"),
+            "val_sharpe_trade": rep.get("sharpe_trade"),
             "val_profit_factor": rep.get("profit_factor"),
             "val_win_rate_pct": rep.get("win_rate_pct"),
             "val_max_dd_pct": rep.get("max_drawdown_pct"),
+            "val_max_dd_mtm_pct": rep.get("max_drawdown_mtm_pct"),
             "val_avg_r": rep.get("avg_r"),
             "val_n_trades": rep.get("n_trades"),
         })
@@ -963,7 +980,11 @@ def train_sliding_walk_forward(
         test_months=CFG.sliding_test_months,
         step_months=CFG.sliding_step_months,
         embargo_bars=CFG.split_embargo_bars,
+        lockbox_start=CFG.lockbox_start_date,
     )
+    if CFG.lockbox_start_date:
+        print(f"  LOCKBOX: bars from {CFG.lockbox_start_date} onward are EXCLUDED "
+              f"from every fold — reserved for the one-time Phase-E reveal.")
     n_folds = len(folds)
     if n_folds == 0:
         raise ValueError("No sliding folds produced — not enough data for the "
@@ -1023,9 +1044,11 @@ def train_sliding_walk_forward(
             "val_profit_factor": val_rep.get("profit_factor"),
             "test_return_pct": test_rep.get("total_return_pct"),
             "test_sharpe": test_rep.get("sharpe_like"),
+            "test_sharpe_trade": test_rep.get("sharpe_trade"),
             "test_profit_factor": test_rep.get("profit_factor"),
             "test_win_rate_pct": test_rep.get("win_rate_pct"),
             "test_max_dd_pct": test_rep.get("max_drawdown_pct"),
+            "test_max_dd_mtm_pct": test_rep.get("max_drawdown_mtm_pct"),
             "test_avg_r": test_rep.get("avg_r"),
             "test_n_trades": test_rep.get("n_trades"),
         })
@@ -1039,17 +1062,20 @@ def train_sliding_walk_forward(
     summary.to_csv(summary_path, index=False)
 
     # ── Stitch every fold's test window into one continuous OOS equity curve ──
+    # Both realized and mark-to-market columns are chained with the same
+    # compounding factor (fold handoff is anchored on realized end equity).
     running = CFG.initial_equity
     parts = []
     for eq in test_equities:
         if eq is None or eq.empty or "equity" not in eq:
             continue
-        s = eq["equity"].astype(float)
-        scaled = s / CFG.initial_equity * running          # chain (compound) folds
-        parts.append(scaled)
-        running = float(scaled.iloc[-1])
-    stitched = pd.concat(parts) if parts else pd.Series(dtype=float)
-    stitched_df = stitched.to_frame("equity")
+        factor = running / CFG.initial_equity              # chain (compound) folds
+        block = pd.DataFrame({"equity": eq["equity"].astype(float) * factor})
+        if "equity_mtm" in eq.columns:
+            block["equity_mtm"] = eq["equity_mtm"].astype(float) * factor
+        parts.append(block)
+        running = float(block["equity"].iloc[-1])
+    stitched_df = pd.concat(parts) if parts else pd.DataFrame(columns=["equity"])
     stitched_path = Path(out_dir) / "sliding_oos_equity.csv"
     stitched_df.to_csv(stitched_path)
 
@@ -1070,15 +1096,15 @@ def train_sliding_walk_forward(
     print(f"  Test folds profit factor>1 : {pf_ok}/{n_folds}")
     print("\n  STITCHED out-of-sample track record (compounded across all test windows):")
     print(f"    total return : {oos.get('total_return_pct'):+.1f}%")
-    print(f"    Sharpe-like  : {oos.get('sharpe_like'):+.2f}")
-    print(f"    max drawdown : {oos.get('max_drawdown_pct'):+.1f}%")
+    print(f"    Sharpe-like  : {oos.get('sharpe_like'):+.2f}   trade-Sharpe: {oos.get('sharpe_trade'):+.2f}")
+    print(f"    max drawdown : {oos.get('max_drawdown_pct'):+.1f}%  (MTM: {oos.get('max_drawdown_mtm_pct'):+.1f}%)")
     print(f"    profit factor: {oos.get('profit_factor'):.2f}   trades: {oos.get('n_trades')}")
     print(f"    curve → {stitched_path}")
 
     # ── Deployment gate on the TEST windows ──────────────────────────────────
     passed, detail = _passes_consistency_gate(
         summary, ret_col="test_return_pct",
-        pf_col="test_profit_factor", sharpe_col="test_sharpe")
+        pf_col="test_profit_factor", sharpe_col="test_sharpe_trade")
     print("\n  Consistency gate (on test windows):")
     for line in detail:
         print(f"    {line}")

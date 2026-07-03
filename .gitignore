@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+models/
+eval_logs/
+outputs/
+runs/*
+!runs/INDEX.md
+*.zip
+*.pkl
