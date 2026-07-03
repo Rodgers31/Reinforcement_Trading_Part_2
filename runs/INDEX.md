@@ -2,8 +2,9 @@
 
 Append-only. One line per full training run (see run_registry.py).
 
-**Running best:** (none yet — moves ONLY via the ratified ship rule: >= +10% relative median AND >= 4/5 seeds beat the running-best median AND no gate regression.)
+**Running best:** `20260703-021710_b9bc9d6_baseline-3seed` (baseline-3seed) — baseline anchor, metric median -0.5282 (PROVISIONAL median-of-3)
 
 | date (UTC) | git sha | label | metric median | gate | verdict |
 |---|---|---|---|---|---|
 | 2026-07-03 | 033e779-dirty | sizing-run | +2.7122 | PASS | sizing (1 fold, 1 seed — NOT a baseline) |
+| 2026-07-03 | b9bc9d6 | baseline-3seed | -0.5282 | FAIL | BASELINE anchor (PROVISIONAL median-of-3); gates 0/3 |

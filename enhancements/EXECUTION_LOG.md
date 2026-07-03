@@ -563,4 +563,71 @@ frozen until the pool finishes.
 - (from sizing) Both-legs-negative eval pattern under the honest ruler —
   candidate revisit of reward/selection interplay (doc 03 §3.4b) AFTER the
   anchor exists.
+- (from baseline) **Churn/flip cost:** 35% of all exits are direction flips
+  (each paying a full round trip) at ~2.7 trades/day — turnover reduction is
+  a first-order Phase-C lever (doc 03 §3.4 reward design territory).
+- (from baseline) **Transfer-not-fit signature:** train+val− is 33% of evals
+  vs 15% both-negative — the agent fits train eras but doesn't transfer;
+  sharpens the case for doc-03 regularization/representation items over
+  capacity increases.
+
+---
+
+## Task 9 — 3-SEED PROVISIONAL BASELINE COMPLETE  ✅ (2026-07-03) — THE ANCHOR
+
+Run `20260703-021710_b9bc9d6_baseline-3seed`: **75/75 jobs, zero failures,
+zero retries.** Wall-clock ≈ **7.9h** (vs ~10h estimate; 56,483s total
+job-time, median 12.6 min/job at 2-way concurrency).
+
+### Headline (PROVISIONAL median-of-3; ratified metric needs 5 seeds)
+
+| seed | metric (ret/\|MTM DD\|) | stitched ret | MTM maxDD | Ulcer | PF | trade-Sharpe | gate |
+|---|---|---|---|---|---|---|---|
+| 42 | −0.528 | −33.5% | −63.4% | 31.1 | 0.984 | −0.19 | FAIL (all 3 legs) |
+| 43 | −0.616 | −38.7% | −62.8% | 32.6 | 0.979 | −0.24 | FAIL (all 3 legs) |
+| 44 | −0.109 | −4.8% | −43.7% | 26.6 | 1.004 | +0.04 | FAIL (all 3 legs) |
+
+**Median metric = −0.5282, seed-IQR = 0.2533. Gates 0/3.** Breadth 8–9/25
+folds positive (need 18); q10 fold-PF 0.81–0.85 (need 0.90); mean trade-Sharpe
+≤ 0. **The as-is system has no deployable OOS edge under the honest ruler**
+across 2012→2024. This is the anchor working as designed — the old stored
++70% test figure was mis-normalized (B3), cost-flattered (~2× underpriced
+recent spread), and gap-flattered (N1); the flattery is now gone.
+**Running-best pointer initialized to this baseline BY DEFINITION** (gate
+verdict recorded separately, per the ratified rule).
+
+### Diagnostics (the binding list)
+
+- **Eligibility:** 64/75 fold-seeds (85%) produced an eligible checkpoint;
+  38.8% of all 1,500 evals were eligible. The sizing scare was NOT systemic —
+  and fold-25/seed-42 (the exact sizing configuration) reproduced its
+  zero-eligible result. The 11 no-eligible fold-seeds scatter across eras
+  (2014, 2017, 2018, 2020, 2022, 2023) and seeds — no single-regime cluster.
+- **Train/val sign patterns (1,500 evals):** train+val+ 39%, **train+val−
+  33%** (the overfit/transfer-failure quadrant), train−val+ 13%, train−val−
+  15%. Dominant failure mode = fits-train-doesn't-transfer, not no-fit.
+- **Churn:** ~8,300–8,650 trades per seed over the stitched 12.5y OOS
+  (≈340 per 6-month window ≈ 2.7/day). Exit mix: SL 37%, **flip_close 35%**,
+  TP 17%, manual 10%, **SL_gap 0.42%** (107 events ≈ 2.9/seed-year —
+  consistent with the N1 census given position-open frequency).
+- **Per-fold metric distribution:** range −0.96 → +5.99. Consistently
+  positive eras: folds 1, 8–9, 25 (2012, 2015–16, 2023H2). Broadly negative:
+  folds 15–24 (2018→2023H1). Full arrays in `baseline_report.json`.
+- **⚑ RECALIBRATION FLAG (flag only — nothing changed):** the pinned +10%
+  RELATIVE ship margin is unusable against this anchor: (a) 10% of |−0.528|
+  ≈ 0.053, which is ~5× SMALLER than the seed-IQR (0.253) — inside noise;
+  (b) relative-% semantics are ill-defined around a negative/near-zero
+  median. The reserved ONE-TIME recalibration should convert the margin to
+  an absolute delta calibrated to the measured seed-IQR (e.g. ship requires
+  median improvement ≥ 1×IQR) — decide at reviewer sign-off, ideally AFTER
+  the 5-seed extension measures the final IQR.
+
+### Artifacts
+Parent run dir (registry.json with full provenance; per-job records), per-seed
+`seed_*_summary.csv` + `seed_*_stitched.csv`, `baseline_report.json`,
+INDEX.md line + running-best pointer (committed).
+
+**STOPPED.** Awaiting sign-off: (1) the {45, 46} extension (+50 jobs ≈ +5h
+wall) to complete the ratified 5-seed baseline; (2) the one-time ship-margin
+recalibration decision. Phase C untouched.
 
