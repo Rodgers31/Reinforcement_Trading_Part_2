@@ -631,3 +631,106 @@ INDEX.md line + running-best pointer (committed).
 wall) to complete the ratified 5-seed baseline; (2) the one-time ship-margin
 recalibration decision. Phase C untouched.
 
+---
+
+## Task 10 — 5-SEED RATIFIED BASELINE (extension {45,46})  ✅ (2026-07-03) — FINAL ANCHOR
+
+Extended the SAME parent run (`--resume --seeds 45,46`): 50 new jobs, 125/125
+total, zero failures. Aggregation derived all 5 seeds from disk (launcher fix
+`0fde88c` — a pre-flight catch: the naive `--seeds 45,46` would have finalized
+a mislabeled median-of-2).
+
+### Ratified anchor (median-of-5)
+
+| seed | metric | stitched ret | MTM maxDD | Ulcer | PF | trade-Sharpe | folds+ | elig | gate |
+|---|---|---|---|---|---|---|---|---|---|
+| 42 | −0.528 | −33.5% | −63.4% | 31.1 | 0.984 | −0.19 | 8/25 | 20/25 | FAIL |
+| 43 | −0.616 | −38.7% | −62.8% | 32.6 | 0.979 | −0.24 | 8/25 | 23/25 | FAIL |
+| 44 | −0.109 | −4.8% | −43.7% | 26.6 | 1.004 | +0.04 | 9/25 | 21/25 | FAIL |
+| 45 | −0.526 | −33.5% | −63.6% | 38.9 | 0.987 | −0.18 | 9/25 | 20/25 | FAIL |
+| 46 | +0.010 | +0.5% | −53.4% | 26.1 | 1.006 | +0.07 | 10/25 | 22/25 | FAIL |
+
+**RATIFIED METRIC = median-of-5 = −0.5260. Seed-IQR = 0.4188. Gates 0/5.**
+Sorted seed metrics: [−0.616, −0.528, −0.526, −0.109, +0.010]. The conclusion
+is unchanged and now robust: **the as-is system has no deployable OOS edge
+under the honest ruler.** Not one seed clears any gate leg; the best seed (46)
+merely breaks even (+0.5% over 12.5y at −53% MTM drawdown).
+
+### Diagnostics refresh — 3-seed → 5-seed shift (125 fold-seeds)
+
+| diagnostic | 3-seed | 5-seed | shift |
+|---|---|---|---|
+| median metric | −0.5282 | −0.5260 | +0.002 (negligible — ROBUST) |
+| **seed-IQR** | 0.2533 | **0.4188** | **materially wider** ⚑ |
+| eligibility | 85.3% | 84.8% | unchanged |
+| train+val− quadrant | 33% | 33% | unchanged (transfer failure persists) |
+| flip_close share | 35% | 35% | unchanged |
+| SL_gap share | 0.42% | 0.44% | unchanged |
+
+**Only material shift: the seed-IQR nearly doubled**, because seed 46 landed at
+break-even (+0.010) while 42/43/45 cluster near −0.55. The median is stable but
+seed dispersion is larger than 3 seeds implied — a single initialization can
+swing the stitched metric by ~0.6. This directly drives the recalibration below.
+Everything else confirms the 3-seed picture verbatim.
+
+### PROPOSAL 1 — one-time ship-margin recalibration (NOT implemented)
+
+The pinned "+10% relative median" margin is unusable against this anchor:
+- Arithmetic: 10% × |−0.526| = **0.0526**. The measured seed-IQR is **0.4188**
+  → the old margin is **~1/8 of one IQR**, i.e. deep inside seed noise; any
+  "win" that small is indistinguishable from a lucky initialization.
+- Relative-% is also ill-defined around a negative/near-zero median.
+
+**Proposed replacement (exact wording), calibrated to the final 5-seed IQR:**
+> Ship a Phase-C variant iff ALL three hold:
+> 1. **MARGIN** — median-of-5(variant) − median-of-5(running-best) ≥ **1 × IQR_baseline**,
+>    where IQR_baseline = **0.4188** (this anchor's 5-seed inter-quartile range).
+>    Concretely: variant median ≥ −0.526 + 0.419 = **−0.107**.
+> 2. **CONSISTENCY** — ≥ 4 of 5 seeds individually beat the running-best median (−0.526). [unchanged]
+> 3. **NO GATE REGRESSION** — variant gate-pass-count ≥ running-best's (0/5 now, so non-binding until something passes). [unchanged]
+
+Notes for the reviewer's ONE-TIME decision (this spends the reserved recalibration):
+- 1×IQR is deliberately strict — a single quick win is unlikely to clear a 0.42
+  jump in one step, so early A/Bs will likely register directional progress
+  without shipping. That is the intended behavior (don't ship noise), but if the
+  goal is to ratchet smaller wins, **0.5×IQR (0.209 → variant median ≥ −0.317)**
+  is the looser alternative.
+- Stronger option worth considering: because every A/B reruns the SAME 25 folds ×
+  5 seeds, a **paired per-fold test** (Wilcoxon signed-rank on the 125 paired
+  metric deltas) has far more power than comparing two 5-number medians, and is
+  robust to the coarse 5-point IQR estimate. Could replace or supplement leg 1.
+
+### PROPOSAL 2 — first Phase-C A/B (NOT started)
+
+Two data-driven candidates from the diagnostics: (a) the transfer-failure
+quadrant (train+val− 33% — the reason gates fail) and (b) flip-churn (35% of
+exits are direction reversals, each a full round-trip under the now-honest cost).
+
+**Recommendation: cost/slippage domain randomization (doc 03 §3.7a) — targeting
+transfer-failure.**
+- *Mechanism:* per-episode sample the cost multiplier around the pinned fracs
+  (e.g. m ~ U[0.6, 1.4] × {spread=0.0623, slip=0.0030}) — **mean held at the
+  measured cost** so the A/B isolates robustness, not a cost-level change. Acts
+  as a regularizer that penalizes cost-fragile/brittle policies → should raise
+  the val-transfer rate (shrink the train+val− quadrant). Secondary: flips are
+  cost-sensitive, so churn may fall as a side effect (measurable via flip_close%).
+- *Why this one first:* lowest risk of the three quick wins — **no observation-
+  shape change** (no new overfitting surface, no collinearity screen), pure
+  env-side change → cleanest attribution; it targets the PRIMARY failure
+  (generalization); and it de-risks doc-02 multi-instrument (per-instrument cost
+  varies) + pairs with doc-05 P2 (observable cost) later.
+- *Runner-up:* HTF context features (§3.1a) is the more direct lever for
+  flip-churn specifically, but changes obs shape (retrain + collinearity screen)
+  — hold as A/B #2 if cost-randomization doesn't move the flip rate.
+- *Exact A/B protocol (doc 04 §3):* ONE change only, nothing else touched.
+  (i) RANK on 3 seeds {42,43,44}: train variant on all 25 folds × 3 seeds
+  (~75 jobs, ~8h), compare its median-of-3 to the running-best's **3-seed**
+  median (−0.5282, apples-to-apples). (ii) If it shows real directional gain,
+  promote to FINALIST: extend to 5 seeds {42–46} (+50 jobs) and apply the full
+  recalibrated ship rule above. (iii) One decision-log row (ship/kill) either
+  way. Dev surface only — the 2024-07+ lockbox stays sealed.
+
+**STOPPED after reporting.** Awaiting sign-off on (1) the recalibration wording
++ 1×IQR vs 0.5×IQR vs paired-test, and (2) the first A/B recommendation. Phase C
+remains untouched — no variant code written, no config changed.
+
