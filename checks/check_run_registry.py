@@ -27,7 +27,7 @@ def main() -> None:
         run_dir = new_run("registry-selftest", seeds=[42, 43, 44], base_dir=base)
 
         assert run_dir.exists() and run_dir.parent == base
-        assert re.match(r"\d{8}_[0-9a-f]{7}(-dirty)?_registry-selftest$", run_dir.name), run_dir.name
+        assert re.match(r"\d{8}-\d{6}_[0-9a-f]{7}(-dirty)?_registry-selftest$", run_dir.name), run_dir.name
 
         reg = json.loads((run_dir / "registry.json").read_text())
         assert reg["seeds"] == [42, 43, 44]

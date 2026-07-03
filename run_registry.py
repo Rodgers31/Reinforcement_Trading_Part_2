@@ -77,7 +77,9 @@ def new_run(label: str, seeds: Iterable[int], base_dir: Path | None = None) -> P
     from config import CFG
 
     base = Path(base_dir) if base_dir else RUNS_DIR
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    # Second-resolution stamp: same-day runs (multi-seed sweeps, retries after
+    # a crash) must never collide — the registry is append-only, never reused.
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     run_dir = base / f"{stamp}_{_git_sha()}_{label}"
     run_dir.mkdir(parents=True, exist_ok=False)
 

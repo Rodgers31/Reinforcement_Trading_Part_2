@@ -440,3 +440,55 @@ checks + end-to-end smoke train green under the new model.
 doc-05 P2 companion (making cost OBSERVABLE to the agent) remains a Phase-C
 item — this task changes what the sim charges, not what the agent sees.
 
+---
+
+## Task 7 — Phase B setup: registry, config switch, sizing run  ✅ (2026-07-03)
+
+**B.0 run registry (`0d8bfc8`):** `runs/<stamp>_<gitsha7>_<label>/` with
+`registry.json` (git SHA incl. `-dirty` flag, data name+SHA256+span, full CFG
+snapshot, seeds, results); committed `runs/INDEX.md` = one line per run + the
+"running best" pointer that moves ONLY via the ratified ship rule. Stamp is
+second-resolution (crash-retries/multi-seed days must never collide — learned
+from the first sizing attempt). Self-test green.
+
+**Config switch (`033e779`):** production dataset = the 0b backbone;
+`start_date=2006-01-01` (census clean start); **lockbox pinned 2024-07-01**
+(ratified: final 24 months). Guard `checks/check_phaseb_config.py`: 7.26M M1
+rows load via CFG, **25 folds** (vs 29 unlocked — the earlier ~28-30 was
+pre-lockbox arithmetic), zero lockbox contact, first train 2006-01-16. Note:
+fold geometry leaves a ~5.5-month untested strip (2024-01→2024-07) before the
+lockbox — full-test-window requirement, not a bug.
+
+**Sizing run (registry entry #1, label `sizing-run`, fold 25/25 = train
+2018→2023, TEST 2023-07→2024-01, seed 42, 3M steps, n_envs=4):**
+- First attempt FAILED: driver lacked the `__main__` guard that
+  `train_ppo.py` documents as required for `n_envs>1` (SubprocVecEnv worker
+  bootstrap re-executed the script → FileExistsError + BrokenPipeError).
+  Fixed; the future baseline launcher inherits the guard.
+- **Timing: 14.1 min train (3,545 env-steps/s), eval ~1s, data load ~8s →
+  ~15 min per fold-seed.** Full baseline = 125 fold-seeds ≈ **31h
+  sequential**; 3-seed provisional ≈ 19h; 16 logical/12 perf cores allow
+  ~2 concurrent jobs (≈17h / ≈10h).
+- **Metric + gate emission verified end-to-end** on real data: per-fold
+  metric +2.71 (test ret +8.57%, PF 1.27, trade-Sharpe +2.01, MTM DD −3.16%,
+  Ulcer 1.26, 202 trades); N3 gate detail lines emitted; registry finalized.
+- **⚠ HONEST-RULER FINDING (one fold, one seed — a flag, not a conclusion):**
+  across all 20 evaluations, **zero checkpoints were eligible** — the val leg
+  was negative at every eval (−1.4R to −43R). `best_model/` was therefore
+  never saved and the test result came from the FINAL (unselected) checkpoint
+  via the documented fallback. Under the honest ruler (ATR costs + gap fills
+  + MTM DD), this fold shows no exploitable val-period edge; the +8.57% test
+  is consistent with a long-lean into a rising test window. Implications:
+  (a) do NOT trim the 3M budget on "plateau" grounds — there was no
+  learning-curve plateau to exploit, and no evidence 3M over-trains;
+  (b) the baseline distribution may be far weaker than the old flattering
+  numbers suggested — which is exactly what the ruler was built to reveal;
+  (c) folds with zero eligible checkpoints contribute their final model to
+  the stitched OOS (system-as-is behavior; the baseline measures it as such).
+
+**PROPOSED COMPUTE PLAN (awaiting sign-off — no full run launched):**
+3-seed provisional anchor first (75 fold-seeds, ~19h sequential / ~10h at
+2-way concurrency), evaluate the never-eligible pattern across folds, then
+extend to 5 seeds (+50 fold-seeds) for the ratified metric. Keep 3M
+steps/fold. Background job-pool launcher with per-job registry logging.
+
