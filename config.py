@@ -267,4 +267,10 @@ import os as _os
 
 _tp_override = _os.environ.get("TURNOVER_PENALTY_R")
 if _tp_override is not None:
-    CFG.turnover_penalty_r = float(_tp_override)
+    try:
+        CFG.turnover_penalty_r = float(_tp_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid TURNOVER_PENALTY_R={_tp_override!r}; expected a float in "
+            f"R-units (e.g. 0.045)") from exc
+    # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.

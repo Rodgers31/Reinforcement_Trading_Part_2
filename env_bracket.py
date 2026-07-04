@@ -80,7 +80,17 @@ class BracketTradingEnv(gym.Env):
         self.commission_per_trade = float(commission_per_trade)
         self.holding_penalty = float(holding_penalty)
         self.reward_mtm_weight = float(reward_mtm_weight)
-        self.turnover_penalty_r = float(turnover_penalty_r)
+        # Validate the turnover penalty at construction (it is env-var-driven, so
+        # a bad value can slip in at launch). A NEGATIVE value would flip the sign
+        # of `reward -= turnover_penalty_r` into a churn REWARD — a silent
+        # inversion of the mechanism — and a NaN/inf would poison the reward and
+        # the policy gradient. Fail loudly rather than train a corrupted run.
+        _tp = float(turnover_penalty_r)
+        if not np.isfinite(_tp) or _tp < 0.0:
+            raise ValueError(
+                f"turnover_penalty_r must be a finite, non-negative float (R-units); "
+                f"got {turnover_penalty_r!r}")
+        self.turnover_penalty_r = _tp
         self.max_episode_steps = max_episode_steps or (len(self.decision_df) - 2)
 
         self.randomize_start = randomize_start

@@ -121,6 +121,17 @@ def main() -> None:
     print(f"[2] reward reduced by exactly K·P = {K_EXPECTED}×{P} = {-total:.4f} R; "
           f"per-step delta is -{P} on {open_steps} open steps, 0 elsewhere  ✓")
 
+    # [3] construction rejects invalid penalties (a negative value would REWARD
+    # turnover; NaN/inf would poison the gradient) — env-var-driven, so guard it.
+    for bad in (-0.01, float("nan"), float("inf")):
+        try:
+            _make_env(bad)
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, f"env accepted invalid turnover_penalty_r={bad!r}"
+    print("[3] construction rejects negative / NaN / inf turnover_penalty_r  ✓")
+
     print("\nALL CHECKS PASS — turnover penalty is reward-only and ruler-isolated.")
 
 
