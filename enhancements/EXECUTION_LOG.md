@@ -931,3 +931,34 @@ a reviewer decision. Turnover reduction is confirmed as the first-order lever; t
 |---|---|---|---|---|---|---|
 | turnover_penalty_r 0→0.045 | 42–46 (finalist) | **+1.807** | **p=0.0204 (FAIL <0.01)** | 0/5 | **NO SHIP** | 5/5 seeds beat; mechanism confirmed (turnover −47%, cost/gross 108→69%, net +28.6k); fails per-fold consistency; running-best UNCHANGED |
 
+---
+
+## Task 15 — A/B #1b: turnover level SWEEP 0.022 (0.5×) — PINNED + LAUNCHED (2026-07-04)
+
+**Reviewer sign-off:** after A/B #1 finalist NO-SHIP, sweep the LOWER pre-declared level.
+This is a NEW A/B (new run dir, own pin), NOT a re-tune of #1.
+
+**PENALTY PINNED — `turnover_penalty_r = 0.022` (= 0.5× the anchor's measured mean real
+per-trade cost 0.0447; the pre-declared alternative level).**
+- *Hypothesis (from #1's failure):* A/B #1 (0.045) failed ONLY the paired-Wilcoxon
+  consistency leg — 74/125 folds improved but **51/125 regressed** (the flat penalty
+  over-suppresses ~41% of folds). Halving the penalty should push fewer folds into the red
+  → a MORE UNIFORM improvement that can clear p<0.01, at the cost of a smaller aggregate
+  median. The test: does 0.022 raise the improved:regressed ratio vs 0.045's 74:51 while
+  still beating the −0.526 anchor?
+- *Pre-committed reads (no mid-run tuning):* consistency improves + still beats anchor +
+  eligibility held → extend to 5-seed finalist (sign-off); aggregate edge collapses
+  (net back toward ≤0) → the flat penalty can't satisfy both aggregate AND consistency →
+  stop the level-sweep thread, move to A/B #2 (cost-domain randomization) or a
+  conviction-scaled redesign.
+
+**Code parity:** runs on the current review-fixed code (env/config input validation added
+after #1). Those edits are proven NEUTRAL at any penalty (byte-identical anchor `f01_s42`
+invariant + unit test re-verified), so this is still a clean one-change A/B vs the anchor
+(only `turnover_penalty_r`: 0 → 0.022). All 75 jobs share identical committed code.
+
+**Launch:** `TURNOVER_PENALTY_R=0.022 run_baseline.py --label turnover-p022-3seed
+--seeds 42,43,44 --concurrency 2 --candidate` — 75 jobs, ~5.4h. On completion: `ab_report`
+vs the anchor (ship-rule preview) PLUS a direct 0.022-vs-0.045 consistency comparison.
+**STOP after the 3-seed report for sign-off.**
+
