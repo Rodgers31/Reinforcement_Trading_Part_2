@@ -773,3 +773,50 @@ bit-identically, unit-test. Task 2 — pin the level (~1× measured real per-tra
 cost ≈ 0.045 R) and launch the 3-seed A/B {42,43,44}. Anchor + honest ruler
 INVIOLATE; ONE change only; STOP after the 3-seed report.
 
+---
+
+## Task 12 — A/B #1 turnover reward: IMPLEMENTED + PENALTY PINNED + LAUNCHED (2026-07-03)
+
+**Task 1 — implemented (`37a593d`).** `turnover_penalty_r` (config default 0.0 =
+anchor; `TURNOVER_PENALTY_R` env override for candidate runs). `env_bracket.step`
+subtracts it from `reward` ONCE per NEW position opened (fresh entry OR the open
+leg of a flip), guarded so 0.0 is a strict no-op. Threaded through
+`train_ppo.build_env` + `run_pipeline`; stamped into `run_info.json`. **Isolation
+PROVEN two ways:** (1) unit test `checks/check_turnover_reward.py` — at penalty
+0.05 the equity / equity_mtm / trade log / return-over-MTM-DD metric are
+BIT-IDENTICAL to penalty 0, while total reward drops by exactly K·P on the K open
+steps and 0 elsewhere; (2) invariant rollout — the stored anchor `f01_s42`
+checkpoint rolled through the modified env at penalty 0 reproduces the anchor's
+`test_trades.csv` + `test_equity.csv` **byte-identically** (md5-equal) and
+`fold_metric` to 10 dp (0.6435982085). The honest (equity-based) ruler is
+untouched by construction.
+
+**Parity smoke (pre-launch, `--candidate`, penalty 0.045):** end-to-end verified
+that the launch env var reaches the job SUBPROCESS — `run_info.turnover_penalty_r
+= 0.045`, registry `cfg.turnover_penalty_r = 0.045` — and that `--candidate`
+leaves the running-best pointer on the anchor (smoke run + INDEX line reverted).
+
+**PENALTY PINNED — `turnover_penalty_r = 0.045 R` (first shot, pinned BEFORE
+launch, no result-tuning).**
+- *Anchor to real cost.* The anchor's measured mean real per-trade cost is
+  0.0683 / mean(sl_atr_mult 1.632) = **0.0447 R** (median 0.0455), from its actual
+  SL-bucket mix (2.0: 46%, 1.5: 35%, 1.0: 19%; 42,234 trades). 0.045 R ≈ **1×**
+  that. So the agent internalises the real round-trip spread a SECOND time —
+  "felt" cost ≈ 2× real — the textbook filter: only take trades expected to beat
+  ~2× cost. Directly targets **RF-1** (cost eats 94–125% of gross via 35%
+  flip-churn at ~2.76 trades/day).
+- *Scale.* ~0.045 × ~338 trades/episode ≈ 15 R vs a `val_r` signal of ±10–40 R —
+  a strong-but-not-idle turnover filter; per-entry it is a gentle 0.045 R nudge
+  against ±1–3 R trade outcomes. Expect a substantial (not total) turnover cut.
+- *Pre-committed follow-ups (no mid-run tuning):* improves NET & keeps eligibility
+  → extend to 5-seed finalist + full ratified ship rule; over-suppresses
+  (near-idle, eligibility collapse) → retry at 0.022 (0.5×); NET worse → kill.
+
+**Launch:** `TURNOVER_PENALTY_R=0.045 run_baseline.py --label turnover-p045-3seed
+--seeds 42,43,44 --concurrency 2 --candidate` — 25 folds × 3 seeds = 75 jobs, 3M
+steps each, ~8h. Same folds/budgets/gate as the anchor; ONLY the reward term
+differs. Lockbox (2024-07+) sealed. On completion: `ab_report.py` →
+per-seed + median-of-3 vs the −0.526 anchor, paired 75-pair Wilcoxon, turnover
+diagnostics (did turnover drop AND net improve?), 4-leg ship-rule PREVIEW.
+**STOP after the 3-seed report for sign-off.**
+
