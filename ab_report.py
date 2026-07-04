@@ -15,9 +15,15 @@ over the running-best iff ALL FOUR legs pass:
   (c) >= 4 / 5 seeds beat the running-best median
   (d) no gate regression  (no gate leg flips OK -> FAIL vs the anchor, per seed)
 
-The 3-seed A/B yields a PREVIEW (legs evaluated on the ranked seeds present); the
-5-seed finalist evaluates the full rule. Turnover diagnostics prove whether the
-mechanism engaged: did turnover drop AND did NET improve?
+The 3-seed A/B yields a PREVIEW: some legs are informative-only until 5 seeds — in
+particular leg (c) ">=4/5 seeds beat" CANNOT pass with 3 seeds, so it is reported as
+"n/a — needs 5 seeds" (not "fail") in preview mode. The 5-seed finalist evaluates
+the full rule. Turnover diagnostics prove whether the mechanism engaged: did
+turnover drop AND did NET improve?
+
+The anchor defaults to the CURRENT running-best (resolved from the "Running best"
+pointer in runs/INDEX.md), so the comparison follows the pointer if it moves; pass
+--anchor only to override.
 
 Usage:
   .venv/bin/python ab_report.py --candidate runs/<cand_dir> [--anchor runs/<dir>]
@@ -36,6 +42,22 @@ SHIP_DELTA_MEDIAN_ABS = 0.21      # 0.5 × baseline seed-IQR 0.4188
 SHIP_WILCOXON_P       = 0.01
 SHIP_MIN_SEEDS_BEAT   = 4          # of the 5-seed finalist
 SHIP_N_SEEDS_FINAL    = 5
+
+
+def _running_best_dir() -> Path | None:
+    """Resolve the current running-best run dir from the pointer of record
+    (runs/INDEX.md). The comparator must follow this pointer so it never silently
+    compares against a stale baseline once running-best moves. None if not found."""
+    import re
+    idx = ROOT / "runs" / "INDEX.md"
+    if not idx.exists():
+        return None
+    for line in idx.read_text().splitlines():
+        if line.startswith("**Running best:**"):
+            m = re.search(r"`([^`]+)`", line)
+            if m:
+                return ROOT / "runs" / m.group(1)
+    return None
 
 
 def _load_report(run_dir: Path) -> dict:
@@ -229,8 +251,10 @@ def _fmt(report: dict) -> str:
         f"   (Δ={L['a_delta_median>=0.21']['delta_median']:+.4f})",
         f"  (b) Wilcoxon p<{SHIP_WILCOXON_P} & median Δ>0 : {'PASS' if L['b_wilcoxon_p<0.01_pos']['pass'] else 'fail'}"
         f"   (p={L['b_wilcoxon_p<0.01_pos']['p_two_sided']}, medianΔ={L['b_wilcoxon_p<0.01_pos']['median_paired_delta']:+.4f}, n={L['b_wilcoxon_p<0.01_pos']['n_pairs']})",
-        f"  (c) >= {SHIP_MIN_SEEDS_BEAT}/5 seeds beat median  : {'PASS' if L['c_>=4of5_seeds_beat_running_best']['pass'] else 'fail'}"
-        f"   ({L['c_>=4of5_seeds_beat_running_best']['n_beat']}/{L['c_>=4of5_seeds_beat_running_best']['n_seeds']} beat {report['anchor_median_running_best']:+.4f})",
+        f"  (c) >= {SHIP_MIN_SEEDS_BEAT}/5 seeds beat median  : "
+        + ("PASS" if L['c_>=4of5_seeds_beat_running_best']['pass']
+           else ("n/a — needs 5 seeds" if not report["is_finalist"] else "fail"))
+        + f"   ({L['c_>=4of5_seeds_beat_running_best']['n_beat']}/{L['c_>=4of5_seeds_beat_running_best']['n_seeds']} beat {report['anchor_median_running_best']:+.4f})",
         f"  (d) no gate regression          : {'PASS' if L['d_no_gate_regression']['pass'] else 'fail'}"
         f"   (cand gates {L['d_no_gate_regression']['cand_gate_pass']}, anchor {L['d_no_gate_regression']['anchor_gate_pass']})",
         f"  => {ship_key}: {report[ship_key]}"
@@ -250,12 +274,17 @@ def _fmt(report: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate", required=True)
-    ap.add_argument("--anchor", default=DEFAULT_ANCHOR)
+    ap.add_argument("--anchor", default=None,
+                    help="anchor run dir; default = current running-best from runs/INDEX.md")
     ap.add_argument("--out", default=None, help="path for ab_report.json (default: candidate dir)")
     args = ap.parse_args()
 
     cand_dir = Path(args.candidate)
-    anch_dir = Path(args.anchor)
+    if args.anchor:
+        anch_dir = Path(args.anchor)
+    else:
+        anch_dir = _running_best_dir() or Path(DEFAULT_ANCHOR)
+        print(f"[ab_report] anchor = running-best from INDEX.md: {anch_dir}")
     report = compare(cand_dir, anch_dir)
     out = Path(args.out) if args.out else (cand_dir / "ab_report.json")
     out.write_text(json.dumps(report, indent=2))
