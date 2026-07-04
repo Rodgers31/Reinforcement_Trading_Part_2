@@ -871,3 +871,63 @@ Protocol: `--resume <run> --seeds 45,46 --candidate` (+50 jobs, ~5h) → re-run 
 for the full ratified rule. **Do NOT ship on the preview; running-best stays the −0.526
 anchor. 5-seed extension launches only on reviewer sign-off.** **STOPPED per instruction.**
 
+---
+
+## Task 14 — A/B #1 turnover reward: 5-SEED FINALIST  ✅ (2026-07-04) — NO SHIP (rule working)
+
+Extended {45,46} into the SAME run (`--resume --candidate`, `TURNOVER_PENALTY_R=0.045`);
+125/125 jobs, all `run_info.turnover_penalty_r=0.045` (parity gate verified). Ran on the
+committed code that trained all 5 seeds identically (the two review-hardening edits were
+applied AFTER the run — see below).
+
+### Finalist — median metric **+1.281** vs anchor **−0.526** (Δ **+1.807**); all 5 seeds beat the anchor
+| seed | metric ← anchor | ret% | PF | trade-Sharpe | folds+ | gate |
+|---|---|---|---|---|---|---|
+| 42 | +1.281 ← −0.528 | +30.7 | 1.031 | +0.264 | 15/25 | FAIL |
+| 43 | +0.525 ← −0.616 | +18.3 | 1.024 | +0.183 | 15/25 | FAIL |
+| 44 | +2.092 ← −0.109 | +69.1 | 1.065 | +0.447 | 11/25 | FAIL |
+| 45 | +0.458 ← −0.526 | +18.2 | 1.024 | +0.179 | 10/25 | FAIL |
+| 46 | +2.079 ← +0.010 | +56.5 | 1.048 | +0.386 | 14/25 | FAIL |
+
+### RATIFIED ship rule — 3/4 legs, **SHIP = False**
+- (a) Δmedian ≥ 0.21 : **PASS** (+1.807)
+- (b) paired Wilcoxon p<0.01 & median Δ>0 : **FAIL — p = 0.0204** (n=125, median Δ +0.209)
+- (c) ≥4/5 seeds beat running-best : **PASS (5/5)**
+- (d) no gate regression : **PASS**
+
+**Why (b) fails despite the huge aggregate:** paired deltas are **74/125 improved, 51/125
+regressed** (mean Δ +0.341 > median +0.209). The lift is carried by large wins on a
+majority of folds while ~41% of cells get worse — a favorable *average trade-off*, not a
+*broad* improvement. The Wilcoxon leg exists precisely to withhold a ship in this case.
+**Deployment gate still 0/5** (breadth 10–15/25 < 18; q10 fold-PF 0.74–0.81 < 0.90; the
+mean-trade-Sharpe leg now PASSES all 5 seeds — real progress toward the gate).
+
+### Mechanism (5-seed, vs anchor, all seeds)
+trades/day 2.76 → **1.46**; flips 35% → **25.6%**; cost/gross **108% → 69%**; net cash
+**−6,902 → +21,679**. RF-1 lever confirmed at scale.
+
+### DECISION — **NO SHIP.** Running-best stays the −0.526 anchor.
+The ratified rule requires all four legs; (b) fails at p=0.020. **The pinned p<0.01 is NOT
+relaxed** (that would be the forbidden result-driven tuning). This is a *strong-but-not-
+broad* outcome — neither the "kill" (net is far better) nor the "over-suppressed→0.022"
+(not near-idle; 5/5 beat; eligibility held) pre-committed branch fires, so the next step is
+a reviewer decision. Turnover reduction is confirmed as the first-order lever; the flat
+0.045 penalty buys aggregate at the cost of per-fold consistency (the one failing dimension).
+
+### PR #2 review (Copilot) — all 5 comments interrogated + addressed
+- **env_bracket validate `turnover_penalty_r` finite/non-negative** (VALID, real footgun: a
+  negative value inverts the term into a churn REWARD; NaN/inf poisons the gradient) — fixed
+  at `__init__`; **neutral at 0.045** (unit test + byte-identical anchor `f01_s42` invariant
+  re-verified). Applied AFTER the run so all 125 jobs share identical training code.
+- **config: clearer `TURNOVER_PENALTY_R` parse error** (VALID, low-sev) — fixed.
+- **passive_ruler_check bull folds** (VALID: stale {9,25} contradicted the measured finding)
+  — now derived from measured gold B&H ≥ +8% (self-consistent; no headline changed).
+- **06-md / README "nothing touched sealed data"** (VALID precision, NOT a breach) — reworded:
+  no *model* train/eval touched the lockbox; raw-price market-fact reads (buy-and-hold) may
+  read beyond it. Lockbox intact.
+
+### Decision-log row (doc 04 §3)
+| change | seeds | Δmedian | Wilcoxon | gate | decision | notes |
+|---|---|---|---|---|---|---|
+| turnover_penalty_r 0→0.045 | 42–46 (finalist) | **+1.807** | **p=0.0204 (FAIL <0.01)** | 0/5 | **NO SHIP** | 5/5 seeds beat; mechanism confirmed (turnover −47%, cost/gross 108→69%, net +28.6k); fails per-fold consistency; running-best UNCHANGED |
+
