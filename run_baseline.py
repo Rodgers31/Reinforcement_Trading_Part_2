@@ -194,7 +194,7 @@ def manage(run_dir: Path, seeds: list[int], steps: int, concurrency: int,
 # ── aggregation + diagnostics ────────────────────────────────────────────────
 
 def aggregate(run_dir: Path, seeds: list[int], folds_limit: int | None,
-              provisional: bool) -> None:
+              provisional: bool, candidate: bool = False) -> None:
     import numpy as np
     import pandas as pd
     from config import CFG
@@ -294,13 +294,25 @@ def aggregate(run_dir: Path, seeds: list[int], folds_limit: int | None,
 
     gates = [per_seed[s]["gate_passed"] for s in seeds]
     tag = "PROVISIONAL median-of-3" if provisional else "ratified median-of-5"
-    finalize_run(run_dir, metric_median=med, gate_passed=all(gates),
-                 verdict=f"BASELINE anchor ({tag}); gates {sum(gates)}/{len(gates)}",
-                 extra=report)
-    set_running_best(run_dir, f"baseline anchor, metric median {med:+.4f} ({tag})")
-    print(json.dumps(report, indent=2))
-    print("[aggregate] baseline_report.json written; INDEX + running-best updated",
-          flush=True)
+    if candidate:
+        # Phase-C variant: record the run + INDEX line but NEVER move running-best
+        # (the pointer moves only via the ratified ship rule — see ab_report.py).
+        from config import CFG as _CFG
+        finalize_run(run_dir, metric_median=med, gate_passed=all(gates),
+                     verdict=(f"Phase-C CANDIDATE turnover_penalty_r={_CFG.turnover_penalty_r} "
+                              f"({tag}); gates {sum(gates)}/{len(gates)}; running-best UNCHANGED "
+                              f"(ship decided by ab_report.py)"), extra=report)
+        print(json.dumps(report, indent=2))
+        print("[aggregate] CANDIDATE report written; INDEX appended; running-best "
+              "DELIBERATELY NOT moved (Phase-C ship rule decides).", flush=True)
+    else:
+        finalize_run(run_dir, metric_median=med, gate_passed=all(gates),
+                     verdict=f"BASELINE anchor ({tag}); gates {sum(gates)}/{len(gates)}",
+                     extra=report)
+        set_running_best(run_dir, f"baseline anchor, metric median {med:+.4f} ({tag})")
+        print(json.dumps(report, indent=2))
+        print("[aggregate] baseline_report.json written; INDEX + running-best updated",
+              flush=True)
 
 
 # ── entry ────────────────────────────────────────────────────────────────────
@@ -316,6 +328,9 @@ def main() -> None:
     ap.add_argument("--job", nargs=2, type=int, default=None, metavar=("FOLD", "SEED"))
     ap.add_argument("--run-dir", default=None)
     ap.add_argument("--aggregate-only", action="store_true")
+    ap.add_argument("--candidate", action="store_true",
+                    help="Phase-C variant run: record + INDEX line, but do NOT move "
+                         "the running-best pointer (ship rule via ab_report.py decides).")
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",")]
 
@@ -337,6 +352,8 @@ def main() -> None:
         reg["anchor_discipline"] = (
             "No config/hparam/cost/eligibility/gate changes in response to this "
             "run. Observations -> Phase-C candidates list only.")
+        from config import CFG as _CFG  # record the effective Phase-C A/B knob
+        reg["turnover_penalty_r"] = _CFG.turnover_penalty_r   # 0.0 = anchor
         reg_path.write_text(json.dumps(reg, indent=2))
         print(f"[pool] parent run: {run_dir}", flush=True)
 
@@ -355,7 +372,8 @@ def main() -> None:
     agg_seeds = sorted(s for s, c in done.items() if c == len(_folds))
     print(f"[aggregate] seeds complete on disk: {agg_seeds}", flush=True)
     aggregate(run_dir, agg_seeds, args.folds_limit,
-              provisional=(set(agg_seeds) != set(RATIFIED_SEED_SET)))
+              provisional=(set(agg_seeds) != set(RATIFIED_SEED_SET)),
+              candidate=args.candidate)
 
 
 if __name__ == "__main__":

@@ -188,6 +188,12 @@ class ProjectConfig:
     # Reward shaping.
     holding_penalty: float = 0.00002
     reward_mtm_weight: float = 0.01
+    # Turnover penalty (Phase-C A/B #1): R-units subtracted from REWARD ONLY on
+    # each NEW position opened (fresh entry or the open leg of a flip). 0.0 = off
+    # = the ratified anchor. Reward-only — it shapes the policy gradient + the
+    # consistency-callback checkpoint selection; it NEVER touches equity, PnL,
+    # fills, cost, the trade log, or the equity-based metric (honest ruler).
+    turnover_penalty_r: float = 0.0
 
     # ── PPO regularisation (generalisation-first preset) ─────────────────────
     # The knobs that most directly control overfitting. Tune these between runs.
@@ -250,3 +256,15 @@ class ProjectConfig:
 
 
 CFG = ProjectConfig()
+
+# ── Phase-C A/B knob override (launch-time, no code edit) ────────────────────
+# A CANDIDATE run may set turnover_penalty_r via the TURNOVER_PENALTY_R env var
+# WITHOUT changing the committed anchor default (0.0). run_baseline passes the
+# parent environment to every job subprocess, so all jobs in a run share one
+# value; it is stamped into each run_info.json and the run registry for audit.
+# Unset env var → CFG stays at the ratified anchor (0.0) → anchor reproduced.
+import os as _os
+
+_tp_override = _os.environ.get("TURNOVER_PENALTY_R")
+if _tp_override is not None:
+    CFG.turnover_penalty_r = float(_tp_override)

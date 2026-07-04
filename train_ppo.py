@@ -113,6 +113,7 @@ def build_env(decision_df, m1_df, feature_cols, randomize_start: bool = False,
         commission_per_trade=CFG.commission_per_trade,
         holding_penalty=CFG.holding_penalty,
         reward_mtm_weight=CFG.reward_mtm_weight,
+        turnover_penalty_r=CFG.turnover_penalty_r,
         randomize_start=randomize_start,
         max_episode_steps=episode_steps,
     )
@@ -500,6 +501,7 @@ def train(
         "risk_fraction": CFG.risk_fraction,
         "spread_atr_frac": CFG.spread_atr_frac,
         "slippage_atr_frac": CFG.slippage_atr_frac,
+        "turnover_penalty_r": CFG.turnover_penalty_r,
     }
     # If the consistency callback saved a best (eligible) checkpoint, record it +
     # its normalisation snapshot so eval/holdout use the SAME checkpoint we'd ship.

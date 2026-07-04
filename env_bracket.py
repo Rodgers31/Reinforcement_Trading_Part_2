@@ -61,6 +61,9 @@ class BracketTradingEnv(gym.Env):
         commission_per_trade: float = 0.0,
         holding_penalty: float = 0.00002,
         reward_mtm_weight: float = 0.01,
+        # Turnover penalty (Phase-C A/B #1): R-units subtracted from REWARD ONLY on
+        # each NEW position open. 0.0 = off = anchor. Never touches equity/PnL/metric.
+        turnover_penalty_r: float = 0.0,
         max_episode_steps: Optional[int] = None,
         randomize_start: bool = False,
     ):
@@ -77,6 +80,7 @@ class BracketTradingEnv(gym.Env):
         self.commission_per_trade = float(commission_per_trade)
         self.holding_penalty = float(holding_penalty)
         self.reward_mtm_weight = float(reward_mtm_weight)
+        self.turnover_penalty_r = float(turnover_penalty_r)
         self.max_episode_steps = max_episode_steps or (len(self.decision_df) - 2)
 
         self.randomize_start = randomize_start
@@ -294,6 +298,7 @@ class BracketTradingEnv(gym.Env):
         close = float(row["Close"])
 
         # Handle explicit close or flip at current decision close.
+        opened_new = False  # a NEW position opened this step (fresh entry OR flip's open leg)
         if self.position.direction != 0:
             current_dir = self.position.direction
             if desired_direction == 0:
@@ -301,10 +306,12 @@ class BracketTradingEnv(gym.Env):
             elif desired_direction != current_dir:
                 self._close_position(close, self._current_time(), "flip_close")
                 self._open_position(desired_direction, sl_idx, tp_idx)
+                opened_new = True
 
         # Fresh entry if flat and action wants exposure.
         if self.position.direction == 0 and desired_direction != 0:
             self._open_position(desired_direction, sl_idx, tp_idx)
+            opened_new = True
 
         # Simulate TP/SL using the M1 candles inside this decision interval.
         self._simulate_m1_until_next_decision()
@@ -325,6 +332,13 @@ class BracketTradingEnv(gym.Env):
         if self.position.direction != 0:
             reward += (unrealized / max(self.position.risk_cash, 1e-12)) * self.reward_mtm_weight
             reward -= self.holding_penalty
+        # Turnover penalty (Phase-C A/B #1): REWARD-ONLY term, charged once per NEW
+        # position opened this step. Guarded so turnover_penalty_r == 0.0 is a strict
+        # no-op (falsy) — equity, realized_pnl, fills, cost, the trade log, and the
+        # equity-based metric are NEVER touched by this term. Applied before the
+        # history append so the logged reward matches the returned reward.
+        if opened_new and self.turnover_penalty_r:
+            reward -= self.turnover_penalty_r
 
         self.history.append({
             "time": self._current_time(),
