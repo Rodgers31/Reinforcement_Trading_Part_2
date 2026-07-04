@@ -242,7 +242,7 @@ def _fmt(report: dict) -> str:
         f"  cost % of gross : {ct['cost_pct_of_gross']}  vs {at['cost_pct_of_gross']}   Δ {t['cost_pct_of_gross_delta']}",
         f"  net PnL (cash)  : {ct['net_pnl']:+.2f}  vs {at['net_pnl']:+.2f}   Δ {t['net_pnl_delta']:+.2f}",
         f"  MECHANISM: turnover {_dir(t['trades_per_day_delta'], 'DROPPED', 'rose')}; "
-        f"net {_dir(t['net_pnl_delta'], 'IMPROVED', 'worsened')}.",
+        f"net {_dir(t['net_pnl_delta'], 'worsened', 'IMPROVED')}.",
     ]
     return "\n".join(lines)
 

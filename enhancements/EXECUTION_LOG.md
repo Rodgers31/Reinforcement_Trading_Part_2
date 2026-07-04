@@ -820,3 +820,54 @@ per-seed + median-of-3 vs the −0.526 anchor, paired 75-pair Wilcoxon, turnover
 diagnostics (did turnover drop AND net improve?), 4-leg ship-rule PREVIEW.
 **STOP after the 3-seed report for sign-off.**
 
+---
+
+## Task 13 — A/B #1 turnover reward: 3-SEED REPORT  ✅ (2026-07-04) — STRONG, but NOT a preview-ship
+
+Run `20260704-034332_53fe6de_turnover-p045-3seed`: **75/75 jobs, 0 failures**,
+~5.4h. `turnover_penalty_r=0.045` (parity-verified in `run_info`/registry).
+Comparator: `ab_report.py --candidate <run>` → `ab_report.json`.
+
+### Headline — median-of-3 metric **+1.281** vs anchor **−0.526**  (Δ **+1.807**)
+Every one of the 3 shared seeds flips from a deep loss to a strong gain:
+
+| seed | metric cand→anchor | RET% cand→anchor | MTM-DD% cand→anchor | PF | trade-Sharpe | nTrades cand→anchor | folds+ |
+|---|---|---|---|---|---|---|---|
+| 42 | +1.281 ← −0.528 | +30.7 ← −33.5 | −24.0 ← −63.4 | 1.031 ← 0.984 | +0.26 ← −0.19 | 4000 ← 8451 | 15/25 ← 8 |
+| 43 | +0.526 ← −0.616 | +18.3 ← −38.7 | −34.9 ← −62.8 | 1.024 ← 0.979 | +0.18 ← −0.24 | 4376 ← 8318 | 15/25 ← 8 |
+| 44 | +2.092 ← −0.109 | +69.1 ← −4.8 | −33.1 ← −43.7 | 1.065 ← 1.004 | +0.45 ← +0.04 | 4429 ← 8650 | 11/25 ← 9 |
+
+### Mechanism ENGAGED exactly as hypothesised (RF-1 targeted)
+- **Turnover halved:** 1.39 vs 2.77 trades/day (Δ −1.37); trade count ~4,300 vs ~8,500.
+- **Flip-churn:** 25.1% vs 35.4% of exits (Δ −10.3 pts).
+- **Cost stops eating the edge:** cost = **68%** of gross vs **111%** (Δ −43 pts).
+- **Net cash −5,782 → +13,076** (Δ +18,858); PF crosses 1.0 on all seeds; MTM-DD ~halved.
+- Not an idleness/ratio artifact: still ~170 trades/fold, DD substantial (−24 to −35%),
+  returns genuinely positive. Isolation proof (Task 12) rules out equity leakage — the
+  gain is the POLICY dropping low-conviction (net-negative-after-cost) trades.
+
+### Ship-rule PREVIEW — 2/4 legs, **NOT a ship** (as expected at 3 seeds)
+- (a) Δmedian ≥ 0.21 : **PASS** (+1.807).
+- (b) paired Wilcoxon p<0.01 & median Δ>0 : **FAIL** — p = **0.030** (n=75, median paired
+  Δ +0.215): significant at 0.05 but not the ratified 0.01; the per-fold gain is real but
+  not yet uniform (several folds still negative).
+- (c) ≥4/5 seeds beat running-best : **3/3 beat** −0.526 but the leg needs 4/5 → resolvable
+  only at 5 seeds (preview limitation, not a failure of the idea).
+- (d) no gate regression : **PASS**.
+- **Deployment gate still 0/3.** The **mean-trade-Sharpe>0** leg now PASSES for all 3 seeds
+  (was failing); breadth (15/15/11 < 18) and q10 fold-PF (0.74–0.81 < 0.90) still FAIL.
+  A large step toward the gate, not through it.
+
+### Decision-log row (doc 04 §3)
+| change | seeds | dev-OOS Δmedian | per-fold Wilcoxon | compute | decision | notes |
+|---|---|---|---|---|---|---|
+| turnover_penalty_r 0→0.045 | 42,43,44 | **+1.807** (cand +1.281) | p=0.030, medianΔ +0.215 (n=75) | 75 jobs ~5.4h | **EXTEND (pending sign-off)** | mechanism confirmed (turnover −50%, cost/gross 111→68%, net +18.9k); ship-rule preview 2/4; gate 0/3 (Sharpe-leg now OK); running-best UNCHANGED |
+
+### Recommendation — **EXTEND to the 5-seed finalist** (awaiting sign-off)
+Meets the pre-committed follow-up ("improves NET & keeps eligibility → finalist"): the
+mechanism is confirmed, all 3 seeds beat the anchor by a wide margin, eligibility held
+(~0.33). The strict legs (Wilcoxon p<0.01, 4/5-seed) can only be settled at 5 seeds.
+Protocol: `--resume <run> --seeds 45,46 --candidate` (+50 jobs, ~5h) → re-run `ab_report`
+for the full ratified rule. **Do NOT ship on the preview; running-best stays the −0.526
+anchor. 5-seed extension launches only on reviewer sign-off.** **STOPPED per instruction.**
+
