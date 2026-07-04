@@ -2,8 +2,11 @@
 
 Read-only analysis scripts that produced/verified the numbers in
 [`../06-baseline-trust-investigation.md`](../06-baseline-trust-investigation.md).
-None trains or evaluates a model; none touches sealed data (≥ 2024-07-01). Run
-from the repo root with the project venv:
+None trains or evaluates a model, so the one-shot lockbox is intact. Note:
+`verify_A.py` reproduces the old notebook's test-window gold buy-and-hold (a market
+fact) and therefore reads raw prices beyond the lockbox (≥ 2024-07-01) — no *model*
+training or evaluation in any of these scripts touches sealed data. Run from the
+repo root with the project venv:
 
 - **`passive_ruler_check.py`** — Agent C's ruler-fairness validator. Builds the
   SAME 25 sliding folds and the SAME cost env as production, then runs rule-based

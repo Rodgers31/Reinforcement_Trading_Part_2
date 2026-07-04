@@ -74,8 +74,12 @@ POLICIES = {
     "random":          baselines.random_policy,
 }
 
-# bull windows flagged per mandate
-BULL = {9, 25}  # fold 9 = 2015-07->2016-01, fold 25 = 2023-07->2024-01
+# "Strong-bull" folds are defined by MEASURED gold buy-and-hold, not a hardcoded
+# list: a fold is bull iff its raw gold B&H >= +8% (matches 06-...md Agent C, which
+# yields folds 10,16,17,18,23). The original mandate's guess {9,25} was wrong by
+# measurement — fold 9 B&H is -0.66% (chop), fold 25 is +2.84% (mild) — so deriving
+# the flag from data keeps this validator self-consistent on any rerun.
+BULL_BH_PCT = 8.0
 
 results = {name: {"rows": [], "equities": [], "trades": []} for name in POLICIES}
 gold_bh = []
@@ -96,7 +100,7 @@ for k, (tr, va, te) in enumerate(folds, 1):
                           periods_per_year=CFG.periods_per_year)["value"].to_dict()
         fm = metric_return_over_mtm_dd(eq, CFG.initial_equity)
         results[name]["rows"].append({
-            "fold": k, "test": win, "bull": k in BULL,
+            "fold": k, "test": win, "bull": bh_ret >= BULL_BH_PCT,
             "gold_bh_pct": round(bh_ret, 3),
             "ret_pct": rep.get("total_return_pct"),
             "pf": rep.get("profit_factor"),
@@ -155,7 +159,7 @@ for name in POLICIES:
 
 # gold buy-and-hold summary + count of bull folds by BH
 gdf = pd.DataFrame({"fold": range(1, len(folds)+1), "gold_bh_pct": gold_bh})
-gdf["bull"] = gdf.fold.isin(BULL)
+gdf["bull"] = gdf.gold_bh_pct >= BULL_BH_PCT
 out["gold_bh"] = {
     "n_bh_positive_folds": int((gdf.gold_bh_pct > 0).sum()),
     "n_folds": len(gdf),

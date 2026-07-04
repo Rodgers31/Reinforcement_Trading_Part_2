@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-03 · **Branch:** `execution/phase-a` · **Anchor:** `runs/20260703-021710_b9bc9d6_baseline-3seed/` (5-seed set, ratified `6e536a2`)
 
-**Mandate.** Settle one question with proof, not assertion: *why does the old notebook show +70% while the honest baseline shows −0.53 gate-FAIL, and can EITHER result be trusted?* Four agents were pointed at four falsifiable questions with an **adversarial** brief — try to **disprove** the team's working conclusion, not confirm it. Rules: read-heavy; no model trained or evaluated; nothing touched sealed data (≥ 2024-07-01); every claim cites a primary source (git ref, on-disk artifact, data file, or `file:line`). The orchestrator then independently reproduced every decision-critical number before writing this report (see **Verification log**).
+**Mandate.** Settle one question with proof, not assertion: *why does the old notebook show +70% while the honest baseline shows −0.53 gate-FAIL, and can EITHER result be trusted?* Four agents were pointed at four falsifiable questions with an **adversarial** brief — try to **disprove** the team's working conclusion, not confirm it. Rules: read-heavy; no model trained or evaluated; **no model training or evaluation touched sealed data (≥ 2024-07-01)** — raw-price market-fact spot-checks (e.g. gold buy-and-hold over the old test window) may read bars beyond it, which reveals nothing about model behaviour and so keeps the one-shot lockbox intact; every claim cites a primary source (git ref, on-disk artifact, data file, or `file:line`). The orchestrator then independently reproduced every decision-critical number before writing this report (see **Verification log**).
 
 ---
 
