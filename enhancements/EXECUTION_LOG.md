@@ -734,3 +734,42 @@ transfer-failure.**
 + 1×IQR vs 0.5×IQR vs paired-test, and (2) the first A/B recommendation. Phase C
 remains untouched — no variant code written, no config changed.
 
+---
+
+## Task 11 — Phase C BEGINS: trust investigation committed + ship rule RATIFIED  ✅ (2026-07-03)
+
+**Both Task-10 STOP items resolved by the reviewer:**
+1. **Ship-margin recalibration → RATIFIED (final; spends the one-time
+   recalibration).** Replaces the noise-sized "+10% relative" with the 0.5×IQR
+   combination: ship iff (a) Δmedian ≥ **0.21 ABSOLUTE** (0.5 × baseline seed-IQR
+   0.4188) AND (b) paired per-(fold,seed) **Wilcoxon signed-rank p<0.01** with
+   positive median delta AND (c) **≥4/5 seeds** beat the running-best median AND
+   (d) **no gate regression**. Recorded in doc 04 §2 (Phase A). Wired into new
+   `ab_report.py`. The +10% relative margin is retired.
+2. **First Phase-C A/B = turnover-aware reward** (reviewer's pick over the
+   cost-randomization runner-up), targeting investigation **RF-1**: the honest
+   baseline has a small GROSS edge that fair cost eats (94–125% of gross) with
+   35% of exits being direction-flips (each a full round trip). Goal: cut
+   low-conviction turnover so NET moves toward positive.
+
+**Task 0.1 — trust investigation committed (`19b5b6c`).** `06-baseline-trust-
+investigation.md` (the −0.526 anchor is TRUSTWORTHY under adversarial attack; the
+old +70% = 0.56× bull-beta + cost flattery, no demonstrable net edge) +
+`enhancements/06_investigation/` verification scripts (ruler-fairness, 2023
+spread, buy-and-hold facts).
+
+**Task 0.2 — `ab_report.py` (A/B comparator + ratified ship-rule evaluator).**
+READ-ONLY (does not touch the system under test): reads candidate + anchor
+`baseline_report.json` / summaries / per-job trade logs, evaluates the four legs
+(3-seed PREVIEW → 5-seed FINALIST), checks gate legs OK→FAIL per seed, and prints
+turnover diagnostics — trades/day, flip%, cost-as-%-of-gross, net PnL — that prove
+whether the mechanism engaged. Self-test vs the anchor reproduces trades/day
+**2.76**, flip **34.9%**, cost **107.8%** of gross (cross-checks the
+investigation's independently-derived figures).
+
+**Next:** Task 1 — implement `turnover_penalty_r` (config knob; reward-only entry
+penalty in `env_bracket.step`), PROVE penalty=0 reproduces the anchor
+bit-identically, unit-test. Task 2 — pin the level (~1× measured real per-trade
+cost ≈ 0.045 R) and launch the 3-seed A/B {42,43,44}. Anchor + honest ruler
+INVIOLATE; ONE change only; STOP after the 3-seed report.
+
