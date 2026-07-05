@@ -339,6 +339,17 @@ def main() -> None:
                 args.folds_limit)
         return
 
+    # Phase-C guardrail (fail-fast): a non-anchor turnover penalty MUST be a candidate
+    # run, else aggregate() would move the running-best pointer for a variant. Placed
+    # AFTER the --job early-return so worker subprocesses (penalty set, no --candidate)
+    # are unaffected — only the top-level launcher is gated.
+    from config import CFG as _CFG
+    if _CFG.turnover_penalty_r != 0.0 and not args.candidate:
+        raise SystemExit(
+            f"Refusing to launch: turnover_penalty_r={_CFG.turnover_penalty_r} != 0 without "
+            f"--candidate. A non-anchor run must not move running-best — pass --candidate "
+            f"(Phase-C A/B) or unset TURNOVER_PENALTY_R.")
+
     if args.resume:
         run_dir = Path(args.resume)
         assert (run_dir / "registry.json").exists(), f"not a run dir: {run_dir}"
