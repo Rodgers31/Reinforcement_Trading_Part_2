@@ -962,3 +962,47 @@ invariant + unit test re-verified), so this is still a clean one-change A/B vs t
 vs the anchor (ship-rule preview) PLUS a direct 0.022-vs-0.045 consistency comparison.
 **STOP after the 3-seed report for sign-off.**
 
+---
+
+## Task 16 — A/B #1b: 0.022 sweep — NO SHIP; flat-penalty level sweep CONCLUDED  ✅ (2026-07-04)
+
+Run `20260704-222152_49a9ef9_turnover-p022-3seed`: 75/75 jobs, all `turnover_penalty_r=0.022`
+(parity verified), running-best UNCHANGED. Hypothesis (a lower penalty improves per-fold
+consistency) is **REFUTED**.
+
+### Head-to-head vs the anchor (shared 3 seeds {42,43,44}, apples-to-apples)
+| level | median-of-3 | improved:regressed | medianΔ | Wilcoxon p | cost/gross | net cash |
+|---|---|---|---|---|---|---|
+| anchor | −0.5282 | — | — | — | 111% | −5,782 |
+| **0.022** | **−0.1687** | **42:33** | +0.080 | **0.4502** | 107% | −2,569 |
+| 0.045 | +1.2810 | 44:31 | +0.215 | 0.0304 | 69% | +21,679 |
+
+Per-seed (shared): s42 −0.528→(0.022)−0.030→(0.045)+1.281; s43 −0.616→**−0.750**→+0.525;
+s44 −0.109→**−0.169**→+2.092. **At 0.022, seeds 43 & 44 are WORSE than their own anchor.**
+
+### Ship rule (0.022 preview): 2/4 — NO SHIP
+(a) Δmedian≥0.21 PASS (+0.357); (b) Wilcoxon **p=0.45 FAIL** (noise); (c) n/a (2/3 beat,
+needs 5 seeds); (d) no gate regression PASS. Gate 0/3.
+
+### CONCLUSION — the FLAT turnover penalty cannot satisfy both aggregate AND consistency
+Two data points bracket it: the mechanism only bites at a STRONG penalty (0.045 cuts
+cost/gross 111%→69%, net −5.8k→+21.7k) but a strong *flat* penalty over-suppresses ~40% of
+folds (fails Wilcoxon, p=0.020); a WEAK penalty (0.022) barely reduces turnover (cost/gross
+→107%), collapses the aggregate, and does NOT improve consistency (42:33 vs 44:31) — it even
+degrades 2/3 seeds. **The level sweep is concluded — no flat level satisfies both; do not
+sweep further (e.g. 0.09 would deepen over-suppression).** Turnover reduction is confirmed as
+the first-order lever; the flat, indiscriminate penalty is the limitation. The fix must be
+SELECTIVE (tax low-conviction/low-edge entries, not all) or attack the root transfer-failure.
+
+### Decision-log rows (doc 04 §3)
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| turnover 0→0.022 | 42,43,44 | +0.357 | p=0.45 (FAIL) | **NO SHIP** | aggregate collapses; consistency NOT improved; degrades 2/3 seeds; concludes the flat-level sweep |
+
+### PR #2 review round 2 — all 4 comments addressed; all 9 threads resolved
+- `ab_report --anchor` now auto-resolves running-best from INDEX.md (`43a03ee`); leg(c)
+  shown `n/a — needs 5 seeds` in preview; INDEX 5-seed row relabeled (extended + NO-SHIP).
+- `run_baseline` fail-fast requires `--candidate` when `turnover_penalty_r!=0` (`0bb4972`) —
+  a variant can't silently move running-best; applied post-run; `--job` workers bypass it;
+  verified (fires w/o --candidate & creates no dir; workers unaffected; anchor not blocked).
+
