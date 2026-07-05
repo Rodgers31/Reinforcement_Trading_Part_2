@@ -64,6 +64,10 @@ class BracketTradingEnv(gym.Env):
         # Turnover penalty (Phase-C A/B #1): R-units subtracted from REWARD ONLY on
         # each NEW position open. 0.0 = off = anchor. Never touches equity/PnL/metric.
         turnover_penalty_r: float = 0.0,
+        # Cost-domain randomization (Phase-C A/B #2): per-episode TRAIN-time cost
+        # multiplier m ~ U[1-cost_rand_frac, 1+cost_rand_frac]. 0.0 = off = anchor
+        # (no RNG draw). Eval/test build this env with 0.0 so the metric is pinned.
+        cost_rand_frac: float = 0.0,
         max_episode_steps: Optional[int] = None,
         randomize_start: bool = False,
     ):
@@ -91,6 +95,15 @@ class BracketTradingEnv(gym.Env):
                 f"turnover_penalty_r must be a finite, non-negative float (R-units); "
                 f"got {turnover_penalty_r!r}")
         self.turnover_penalty_r = _tp
+        # Cost-domain randomization (A/B #2): validate in [0,1) — >=1 would allow a
+        # zero/negative cost draw. The per-episode multiplier lives in _cost_mult
+        # (1.0 until reset() draws one, and only when cost_rand_frac>0).
+        _cr = float(cost_rand_frac)
+        if not np.isfinite(_cr) or not (0.0 <= _cr < 1.0):
+            raise ValueError(
+                f"cost_rand_frac must be a finite float in [0.0, 1.0); got {cost_rand_frac!r}")
+        self.cost_rand_frac = _cr
+        self._cost_mult = 1.0
         self.max_episode_steps = max_episode_steps or (len(self.decision_df) - 2)
 
         self.randomize_start = randomize_start
@@ -128,6 +141,15 @@ class BracketTradingEnv(gym.Env):
             self.i = int(self.np_random.integers(0, max_start))
         else:
             self.i = 0
+        # Cost-domain randomization (A/B #2): draw a per-episode cost multiplier
+        # ONLY when enabled. At cost_rand_frac == 0 no RNG is consumed here, so
+        # training is bit-identical to the anchor. U[1-f, 1+f] has mean 1.0, so the
+        # measured cost level is held — only its dispersion is learned against.
+        if self.cost_rand_frac > 0.0:
+            self._cost_mult = float(self.np_random.uniform(1.0 - self.cost_rand_frac,
+                                                           1.0 + self.cost_rand_frac))
+        else:
+            self._cost_mult = 1.0
         self.steps = 0
         self.equity = self.initial_equity
         self.realized_pnl = 0.0
@@ -176,9 +198,11 @@ class BracketTradingEnv(gym.Env):
         return obs
 
     def _half_cost(self, atr: float) -> float:
-        """Per-side execution cost in price units at a given ATR:
-        half-spread + slippage, both as fractions of ATR."""
-        return (self.spread_atr_frac / 2.0 + self.slippage_atr_frac) * atr
+        """Per-side execution cost in price units at a given ATR: half-spread +
+        slippage, both as fractions of ATR, scaled by the per-episode cost-domain
+        multiplier (A/B #2). _cost_mult == 1.0 unless training-time randomization is
+        enabled, so eval/test cost is exactly the pinned value (× 1.0 is exact)."""
+        return (self.spread_atr_frac / 2.0 + self.slippage_atr_frac) * atr * self._cost_mult
 
     def _entry_price(self, close: float, direction: int, atr: float) -> float:
         return close + direction * self._half_cost(atr)

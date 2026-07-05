@@ -194,6 +194,12 @@ class ProjectConfig:
     # consistency-callback checkpoint selection; it NEVER touches equity, PnL,
     # fills, cost, the trade log, or the equity-based metric (honest ruler).
     turnover_penalty_r: float = 0.0
+    # Cost-domain randomization (Phase-C A/B #2): per-episode, the TRAINING env
+    # scales its execution cost by m ~ U[1-cost_rand_frac, 1+cost_rand_frac] (mean
+    # held at the measured cost) so the policy learns cost-robustness. 0.0 = off =
+    # anchor. TRAIN-ONLY: eval/val/test rollouts and the equity-based metric always
+    # use the pinned cost — the honest ruler is NEVER randomized.
+    cost_rand_frac: float = 0.0
 
     # ── PPO regularisation (generalisation-first preset) ─────────────────────
     # The knobs that most directly control overfitting. Tune these between runs.
@@ -273,4 +279,14 @@ if _tp_override is not None:
         raise ValueError(
             f"Invalid TURNOVER_PENALTY_R={_tp_override!r}; expected a float in "
             f"R-units (e.g. 0.045)") from exc
+    # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.
+
+_cr_override = _os.environ.get("COST_RAND_FRAC")
+if _cr_override is not None:
+    try:
+        CFG.cost_rand_frac = float(_cr_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid COST_RAND_FRAC={_cr_override!r}; expected a float in [0,1) "
+            f"(e.g. 0.4 = U[0.6,1.4])") from exc
     # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.

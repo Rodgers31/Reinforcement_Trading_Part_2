@@ -30,10 +30,13 @@ from model_artifacts import load_run_info
 
 # ── Pickle-safe factory for SubprocVecEnv ────────────────────────────────────
 # Must be at module level (not a lambda) so subprocesses can import it.
-def _spawn_train_env(decision_df, m1_df, feature_cols, episode_steps):
-    """Called inside each worker process to build one training environment."""
+def _spawn_train_env(decision_df, m1_df, feature_cols, episode_steps, cost_rand_frac=0.0):
+    """Called inside each worker process to build one training environment.
+    cost_rand_frac>0 enables per-episode cost-domain randomization (A/B #2) in the
+    TRAIN env only; eval/test envs are built elsewhere with the pinned cost."""
     return build_env(decision_df, m1_df, feature_cols,
-                     randomize_start=True, episode_steps=episode_steps)
+                     randomize_start=True, episode_steps=episode_steps,
+                     cost_rand_frac=cost_rand_frac)
 
 
 def _slice_m1_for_decision_window(m1_df, decision_df):
@@ -99,7 +102,7 @@ def load_folds():
 
 
 def build_env(decision_df, m1_df, feature_cols, randomize_start: bool = False,
-              episode_steps: int | None = None):
+              episode_steps: int | None = None, cost_rand_frac: float = 0.0):
     env = BracketTradingEnv(
         decision_df,
         m1_df,
@@ -114,6 +117,7 @@ def build_env(decision_df, m1_df, feature_cols, randomize_start: bool = False,
         holding_penalty=CFG.holding_penalty,
         reward_mtm_weight=CFG.reward_mtm_weight,
         turnover_penalty_r=CFG.turnover_penalty_r,
+        cost_rand_frac=cost_rand_frac,   # TRAIN-only; eval callers use the 0.0 default
         randomize_start=randomize_start,
         max_episode_steps=episode_steps,
     )
@@ -361,7 +365,8 @@ def train(
         # partial() wraps a module-level function so it is pickle-safe on Windows.
         from stable_baselines3.common.vec_env import SubprocVecEnv
         env_fns = [
-            partial(_spawn_train_env, train_feat, train_m1, feature_cols, train_episode_steps)
+            partial(_spawn_train_env, train_feat, train_m1, feature_cols,
+                    train_episode_steps, CFG.cost_rand_frac)
             for _ in range(n_envs)
         ]
         start_method = "spawn" if sys.platform == "win32" else "forkserver"
@@ -371,7 +376,8 @@ def train(
         print("Training envs : 1 (DummyVecEnv — set n_envs=4 for ~4x speedup)")
         train_env_raw = DummyVecEnv([
             lambda: build_env(train_feat, train_m1, feature_cols,
-                              randomize_start=True, episode_steps=train_episode_steps)
+                              randomize_start=True, episode_steps=train_episode_steps,
+                              cost_rand_frac=CFG.cost_rand_frac)
         ])
 
     train_env = VecNormalize(train_env_raw, norm_obs=True, norm_reward=True, clip_obs=10.0)
@@ -502,6 +508,7 @@ def train(
         "spread_atr_frac": CFG.spread_atr_frac,
         "slippage_atr_frac": CFG.slippage_atr_frac,
         "turnover_penalty_r": CFG.turnover_penalty_r,
+        "cost_rand_frac": CFG.cost_rand_frac,
     }
     # If the consistency callback saved a best (eligible) checkpoint, record it +
     # its normalisation snapshot so eval/holdout use the SAME checkpoint we'd ship.

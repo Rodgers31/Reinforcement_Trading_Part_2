@@ -339,16 +339,18 @@ def main() -> None:
                 args.folds_limit)
         return
 
-    # Phase-C guardrail (fail-fast): a non-anchor turnover penalty MUST be a candidate
-    # run, else aggregate() would move the running-best pointer for a variant. Placed
-    # AFTER the --job early-return so worker subprocesses (penalty set, no --candidate)
-    # are unaffected — only the top-level launcher is gated.
+    # Phase-C guardrail (fail-fast): ANY non-anchor knob (turnover penalty, cost
+    # randomization, …) MUST be a candidate run, else aggregate() would move the
+    # running-best pointer for a variant. Placed AFTER the --job early-return so worker
+    # subprocesses (knob set, no --candidate) are unaffected — only the launcher is gated.
     from config import CFG as _CFG
-    if _CFG.turnover_penalty_r != 0.0 and not args.candidate:
+    _nonanchor = {k: v for k, v in (("turnover_penalty_r", _CFG.turnover_penalty_r),
+                                    ("cost_rand_frac", _CFG.cost_rand_frac)) if v != 0.0}
+    if _nonanchor and not args.candidate:
         raise SystemExit(
-            f"Refusing to launch: turnover_penalty_r={_CFG.turnover_penalty_r} != 0 without "
-            f"--candidate. A non-anchor run must not move running-best — pass --candidate "
-            f"(Phase-C A/B) or unset TURNOVER_PENALTY_R.")
+            f"Refusing to launch: non-anchor knob(s) {_nonanchor} without --candidate. A "
+            f"non-anchor run must not move running-best — pass --candidate (Phase-C A/B) "
+            f"or unset the knob(s).")
 
     if args.resume:
         run_dir = Path(args.resume)
@@ -363,8 +365,9 @@ def main() -> None:
         reg["anchor_discipline"] = (
             "No config/hparam/cost/eligibility/gate changes in response to this "
             "run. Observations -> Phase-C candidates list only.")
-        from config import CFG as _CFG  # record the effective Phase-C A/B knob
+        from config import CFG as _CFG  # record the effective Phase-C A/B knobs
         reg["turnover_penalty_r"] = _CFG.turnover_penalty_r   # 0.0 = anchor
+        reg["cost_rand_frac"] = _CFG.cost_rand_frac           # 0.0 = anchor
         reg_path.write_text(json.dumps(reg, indent=2))
         print(f"[pool] parent run: {run_dir}", flush=True)
 
