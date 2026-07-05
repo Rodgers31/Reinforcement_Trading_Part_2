@@ -367,6 +367,7 @@ def main() -> None:
             "run. Observations -> Phase-C candidates list only.")
         from config import CFG as _CFG  # record the effective Phase-C A/B knobs
         reg["turnover_penalty_r"] = _CFG.turnover_penalty_r   # 0.0 = anchor
+        reg["turnover_entry_frac"] = _CFG.turnover_entry_frac  # 1.0 = flat (A/B #1)
         reg["cost_rand_frac"] = _CFG.cost_rand_frac           # 0.0 = anchor
         reg_path.write_text(json.dumps(reg, indent=2))
         print(f"[pool] parent run: {run_dir}", flush=True)

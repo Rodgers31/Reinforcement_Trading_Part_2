@@ -194,6 +194,10 @@ class ProjectConfig:
     # consistency-callback checkpoint selection; it NEVER touches equity, PnL,
     # fills, cost, the trade log, or the equity-based metric (honest ruler).
     turnover_penalty_r: float = 0.0
+    # Flip-aware turnover (Phase-C A/B #3): fraction of turnover_penalty_r charged to a
+    # FRESH entry; a FLIP/reversal always pays the full penalty. 1.0 = A/B #1 flat; 0.0 =
+    # tax flips only (spare fresh entries). Reward-only, like turnover_penalty_r.
+    turnover_entry_frac: float = 1.0
     # Cost-domain randomization (Phase-C A/B #2): per-episode, the TRAINING env
     # scales its execution cost by m ~ U[1-cost_rand_frac, 1+cost_rand_frac] (mean
     # held at the measured cost) so the policy learns cost-robustness. 0.0 = off =
@@ -289,4 +293,14 @@ if _cr_override is not None:
         raise ValueError(
             f"Invalid COST_RAND_FRAC={_cr_override!r}; expected a float in [0,1) "
             f"(e.g. 0.4 = U[0.6,1.4])") from exc
+    # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.
+
+_tef_override = _os.environ.get("TURNOVER_ENTRY_FRAC")
+if _tef_override is not None:
+    try:
+        CFG.turnover_entry_frac = float(_tef_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid TURNOVER_ENTRY_FRAC={_tef_override!r}; expected a float fraction "
+            f"(e.g. 0.0 = tax flips only)") from exc
     # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.

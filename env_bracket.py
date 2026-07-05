@@ -64,6 +64,9 @@ class BracketTradingEnv(gym.Env):
         # Turnover penalty (Phase-C A/B #1): R-units subtracted from REWARD ONLY on
         # each NEW position open. 0.0 = off = anchor. Never touches equity/PnL/metric.
         turnover_penalty_r: float = 0.0,
+        # Flip-aware turnover (Phase-C A/B #3): fraction of turnover_penalty_r charged
+        # to a FRESH entry (flips always pay full). 1.0 = A/B #1 flat; 0.0 = tax flips only.
+        turnover_entry_frac: float = 1.0,
         # Cost-domain randomization (Phase-C A/B #2): per-episode TRAIN-time cost
         # multiplier m ~ U[1-cost_rand_frac, 1+cost_rand_frac]. 0.0 = off = anchor
         # (no RNG draw). Eval/test build this env with 0.0 so the metric is pinned.
@@ -95,6 +98,12 @@ class BracketTradingEnv(gym.Env):
                 f"turnover_penalty_r must be a finite, non-negative float (R-units); "
                 f"got {turnover_penalty_r!r}")
         self.turnover_penalty_r = _tp
+        # Flip-aware fresh-entry weight (A/B #3): finite, non-negative (typically [0,1]).
+        _tef = float(turnover_entry_frac)
+        if not np.isfinite(_tef) or _tef < 0.0:
+            raise ValueError(
+                f"turnover_entry_frac must be a finite, non-negative float; got {turnover_entry_frac!r}")
+        self.turnover_entry_frac = _tef
         # Cost-domain randomization (A/B #2): validate in [0,1) — >=1 would allow a
         # zero/negative cost draw. The per-episode multiplier lives in _cost_mult
         # (1.0 until reset() draws one, and only when cost_rand_frac>0).
@@ -332,7 +341,10 @@ class BracketTradingEnv(gym.Env):
         close = float(row["Close"])
 
         # Handle explicit close or flip at current decision close.
-        opened_new = False  # a NEW position opened this step (fresh entry OR flip's open leg)
+        # Per-open turnover-penalty weight (A/B #3 flip-aware): 0.0 = no open this step;
+        # 1.0 = a FLIP/reversal (low conviction — full penalty); turnover_entry_frac
+        # = a FRESH entry (higher conviction — reduced/zero penalty).
+        open_pen_weight = 0.0
         if self.position.direction != 0:
             current_dir = self.position.direction
             if desired_direction == 0:
@@ -340,12 +352,12 @@ class BracketTradingEnv(gym.Env):
             elif desired_direction != current_dir:
                 self._close_position(close, self._current_time(), "flip_close")
                 self._open_position(desired_direction, sl_idx, tp_idx)
-                opened_new = True
+                open_pen_weight = 1.0                        # FLIP — full penalty
 
         # Fresh entry if flat and action wants exposure.
         if self.position.direction == 0 and desired_direction != 0:
             self._open_position(desired_direction, sl_idx, tp_idx)
-            opened_new = True
+            open_pen_weight = self.turnover_entry_frac       # FRESH — reduced (A/B #3)
 
         # Simulate TP/SL using the M1 candles inside this decision interval.
         self._simulate_m1_until_next_decision()
@@ -366,13 +378,13 @@ class BracketTradingEnv(gym.Env):
         if self.position.direction != 0:
             reward += (unrealized / max(self.position.risk_cash, 1e-12)) * self.reward_mtm_weight
             reward -= self.holding_penalty
-        # Turnover penalty (Phase-C A/B #1): REWARD-ONLY term, charged once per NEW
-        # position opened this step. Guarded so turnover_penalty_r == 0.0 is a strict
-        # no-op (falsy) — equity, realized_pnl, fills, cost, the trade log, and the
-        # equity-based metric are NEVER touched by this term. Applied before the
-        # history append so the logged reward matches the returned reward.
-        if opened_new and self.turnover_penalty_r:
-            reward -= self.turnover_penalty_r
+        # Turnover penalty (Phase-C A/B #1 flat / #3 flip-aware): REWARD-ONLY term,
+        # charged once per NEW position. A flip pays turnover_penalty_r; a fresh entry
+        # pays turnover_penalty_r * turnover_entry_frac (entry_frac=1.0 -> A/B #1 flat;
+        # 0.0 -> tax flips only). Guarded so turnover_penalty_r==0 OR weight==0 is a
+        # strict no-op — NEVER touches equity, PnL, fills, the trade log, or the metric.
+        if self.turnover_penalty_r and open_pen_weight:
+            reward -= self.turnover_penalty_r * open_pen_weight
 
         self.history.append({
             "time": self._current_time(),

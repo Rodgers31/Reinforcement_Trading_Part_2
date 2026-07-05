@@ -47,7 +47,7 @@ def _synthetic_data(n_dec: int = 16):
     return dec, m1
 
 
-def _make_env(turnover_penalty_r: float) -> BracketTradingEnv:
+def _make_env(turnover_penalty_r: float, turnover_entry_frac: float = 1.0) -> BracketTradingEnv:
     dec, m1 = _synthetic_data()
     return BracketTradingEnv(
         dec, m1, FEATURES,
@@ -55,6 +55,7 @@ def _make_env(turnover_penalty_r: float) -> BracketTradingEnv:
         tp_r_multipliers=(1.0, 1.5, 2.0, 3.0),
         commission_per_trade=0.0,
         turnover_penalty_r=turnover_penalty_r,
+        turnover_entry_frac=turnover_entry_frac,
         randomize_start=False,
     )
 
@@ -120,6 +121,22 @@ def main() -> None:
         "some step reward changed by an amount other than 0 or -P"
     print(f"[2] reward reduced by exactly K·P = {K_EXPECTED}×{P} = {-total:.4f} R; "
           f"per-step delta is -{P} on {open_steps} open steps, 0 elsewhere  ✓")
+
+    # [4] flip-aware split (A/B #3): flips pay full turnover_penalty_r, fresh entries
+    # pay turnover_penalty_r*turnover_entry_frac. ACTIONS = 3 fresh (steps 0,3,7) +
+    # 1 flip (step 4). entry_frac=1.0 nests the A/B #1 flat behaviour.
+    r_anchor, eq_anchor, tr_anchor = _run(_make_env(0.0))
+    N_FLIP, N_FRESH = 1, 3
+    for tef, expected in [(1.0, (N_FLIP + N_FRESH) * P),          # flat (A/B #1)
+                          (0.0, N_FLIP * P),                       # tax flips only
+                          (0.5, (N_FLIP + N_FRESH * 0.5) * P)]:    # partial
+        rT, eqT, trT = _run(_make_env(P, tef))
+        assert np.array_equal(eq_anchor["equity"].to_numpy(), eqT["equity"].to_numpy()) \
+            and tr_anchor.equals(trT), f"flip-aware entry_frac={tef} changed equity/trade-log"
+        got = float((r_anchor - rT).sum())
+        assert abs(got - expected) < 1e-12, f"entry_frac={tef}: penalty {got} != {expected}"
+    print("[4] flip-aware: flips pay full, fresh scaled by entry_frac "
+          f"(1.0→{4*P:.3f}, 0.0→{P:.3f}, 0.5→{2.5*P:.3f} R); equity/trade-log unchanged  ✓")
 
     # [3] construction rejects invalid penalties (a negative value would REWARD
     # turnover; NaN/inf would poison the gradient) — env-var-driven, so guard it.

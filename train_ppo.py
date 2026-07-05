@@ -117,6 +117,7 @@ def build_env(decision_df, m1_df, feature_cols, randomize_start: bool = False,
         holding_penalty=CFG.holding_penalty,
         reward_mtm_weight=CFG.reward_mtm_weight,
         turnover_penalty_r=CFG.turnover_penalty_r,
+        turnover_entry_frac=CFG.turnover_entry_frac,
         cost_rand_frac=cost_rand_frac,   # TRAIN-only; eval callers use the 0.0 default
         randomize_start=randomize_start,
         max_episode_steps=episode_steps,
@@ -508,6 +509,7 @@ def train(
         "spread_atr_frac": CFG.spread_atr_frac,
         "slippage_atr_frac": CFG.slippage_atr_frac,
         "turnover_penalty_r": CFG.turnover_penalty_r,
+        "turnover_entry_frac": CFG.turnover_entry_frac,
         "cost_rand_frac": CFG.cost_rand_frac,
     }
     # If the consistency callback saved a best (eligible) checkpoint, record it +
