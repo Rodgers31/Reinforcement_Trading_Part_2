@@ -1044,3 +1044,49 @@ unit test still green (no regression). Guard + registry extended to `cost_rand_f
 `cost_rand_frac` differs. Lockbox sealed. On completion: `ab_report` vs anchor (ship preview) +
 transfer diagnostics (train+val− quadrant, flip%). **STOP after the 3-seed report for sign-off.**
 
+---
+
+## Task 18 — A/B #2: cost randomization 0.4 — NO SHIP; clean NULL result  ✅ (2026-07-05)
+
+Run `20260705-072309_c2eb933_costrand-p40`: 75/75 jobs, all `cost_rand_frac=0.4`,
+`turnover_penalty_r=0.0` (parity verified), running-best UNCHANGED. **The intervention moved
+nothing it was designed to move.**
+
+### vs the anchor (shared 3 seeds)
+| metric | anchor | costrand 0.4 | Δ |
+|---|---|---|---|
+| median-of-3 | −0.5282 | −0.5503 | **−0.024** |
+| Wilcoxon p (75 pairs) | — | **0.99** | medianΔ −0.025 |
+| improved:regressed | — | **37:38** | coin flip |
+| **train+val− quadrant** | **33.0%** | **34.5%** | unchanged |
+| train+val+ | 38.6% | 38.9% | unchanged |
+| eligibility | 0.386 | 0.389 | unchanged |
+| flip % | 35.4% | 34.3% | −1.1 (noise) |
+| net cash | −5,782 | −5,708 | +74 (noise) |
+
+Per-seed noise: s42 −0.550, s43 **+0.142**, s44 **−0.782** (one up, one down, one flat).
+Ship rule 1/4 (only 'no gate regression'); **SHIP preview = False**.
+
+### CONCLUSION — cost-robustness is NOT the lever; ruled out
+±40% mean-held cost randomization left the metric, the **train+val− transfer quadrant**, turnover,
+eligibility, and net all statistically unchanged (p=0.99). The dominant failure
+(fits-train-fails-transfer, 33%) is therefore **NOT cost-fragility** — plausibly because the cost
+is already ATR-relative (regime-invariant by construction), so there was little cost-brittleness
+to regularize away. Transfer failure is more likely **representation/feature overfitting** (the
+agent fits train-era price/feature patterns). Widening the band is unlikely to help (the
+mechanism didn't engage at all, not merely weakly). **Cost randomization is concluded — no ship.**
+
+### Phase-C picture so far (2 A/Bs, both NO SHIP; anchor −0.526 stands)
+- **A/B #1 turnover:** the ONLY lever that moved the metric strongly (net −5.8k→+21.7k at 0.045)
+  but fails per-fold consistency (flat penalty over-suppresses ~40% of folds); level sweep proved
+  no flat level satisfies both.
+- **A/B #2 cost-rand:** null — transfer isn't cost-driven.
+→ Next should either **salvage the confirmed turnover lever with a conviction-scaled (selective)
+penalty**, or attack the transfer overfitting from the **representation/regularization** side
+(the cost side is now ruled out).
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| cost_rand_frac 0→0.4 | 42,43,44 | −0.024 | p=0.99 | **NO SHIP** | null; train+val− 33→34.5% unchanged; cost-robustness not the lever; transfer failure is not cost-driven |
+
