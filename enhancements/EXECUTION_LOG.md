@@ -1090,3 +1090,40 @@ penalty**, or attack the transfer overfitting from the **representation/regulari
 |---|---|---|---|---|---|
 | cost_rand_frac 0→0.4 | 42,43,44 | −0.024 | p=0.99 | **NO SHIP** | null; train+val− 33→34.5% unchanged; cost-robustness not the lever; transfer failure is not cost-driven |
 
+---
+
+## Task 19 — A/B #3: flip-aware turnover penalty — IMPLEMENTED + PINNED + LAUNCHED (2026-07-05)
+
+Reviewer chose the flip-aware (conviction-scaled) turnover penalty to salvage A/B #1's lever.
+(The literal action-prob/value-scaled version was ruled out: the env reward can't cleanly see
+policy internals, and reward-by-value is circular with GAE — a heavier PPO-rollout change.)
+
+**Implemented (committed).** `turnover_entry_frac` knob (config default 1.0 = A/B #1 flat;
+`TURNOVER_ENTRY_FRAC` env override). In `env_bracket.step()` a NEW open carries a penalty weight:
+a **FLIP** pays the full `turnover_penalty_r`; a **FRESH** entry pays
+`turnover_penalty_r × turnover_entry_frac`. Reward-only, guarded no-op at penalty=0 or weight=0.
+
+**Isolation PROVEN.** `check_turnover_reward.py [4]`: entry_frac 1.0/0.0/0.5 → 4P/1P/2.5P penalty
+(the ACTIONS episode = 3 fresh + 1 flip), so **entry_frac=1.0 exactly nests A/B #1's flat 0.045**;
+equity/trade-log unchanged (reward-only). Anchor byte-identical invariant re-verified (turnover=0);
+cost-randomization unit test still green. run_info + registry record the knob.
+
+**PIN — `turnover_penalty_r = 0.045`, `turnover_entry_frac = 0.0` (tax FLIPS only).**
+- *Diagnosis of A/B #1's failure:* the flat 0.045 gave net −5.8k→+21.7k but over-suppressed ~40%
+  of folds because it taxed GOOD fresh entries too (failed Wilcoxon p=0.020).
+- *This A/B:* keep the validated per-open level 0.045 but charge it ONLY on flips (the 35%
+  flip-churn = low-conviction reversals); fresh directional entries pay nothing.
+- *Hypothesis:* reduces the reversal churn (preserving A/B #1's net benefit) WITHOUT suppressing
+  the high-conviction fresh entries → more UNIFORM per-fold improvement → clears the consistency
+  leg A/B #1 failed. Key comparisons: vs anchor (ship) AND vs A/B #1 flat (does sparing fresh
+  entries fix consistency?).
+- *Pre-committed reads:* consistency improves (Wilcoxon p<0.01) + beats anchor + eligibility held
+  → 5-seed finalist; aggregate collapses (net→≤0, i.e. the benefit needed the broad tax) →
+  flip-only insufficient, conclude; no change vs A/B #1 → flip-awareness doesn't matter (benefit
+  was total turnover reduction, not selectivity).
+
+**Launch:** `TURNOVER_PENALTY_R=0.045 TURNOVER_ENTRY_FRAC=0.0 run_baseline.py
+--label turnover-flipaware-p045 --seeds 42,43,44 --concurrency 2 --candidate` — 75 jobs, ~5.4h.
+Same folds/budgets/gate; only the turnover mechanism differs (flat→flip-aware). Lockbox sealed.
+On completion: `ab_report` vs anchor + consistency/flip% comparison vs A/B #1. **STOP for sign-off.**
+
