@@ -1006,3 +1006,41 @@ SELECTIVE (tax low-conviction/low-edge entries, not all) or attack the root tran
   a variant can't silently move running-best; applied post-run; `--job` workers bypass it;
   verified (fires w/o --candidate & creates no dir; workers unaffected; anchor not blocked).
 
+---
+
+## Task 17 — A/B #2: cost-domain randomization — IMPLEMENTED + PINNED + LAUNCHED (2026-07-04)
+
+Reviewer chose A/B #2 (cost-domain randomization) after the turnover-level sweep concluded.
+Targets the ROOT of the per-fold inconsistency: fits-train-fails-transfer (train+val− 33%).
+
+**Implemented (committed).** `cost_rand_frac` knob (config default 0.0 = anchor; `COST_RAND_FRAC`
+env override). In `env_bracket.reset()` the TRAIN env draws a per-episode multiplier
+`m ~ U[1−f, 1+f]` (mean 1.0) that scales `_half_cost`; at f=0 no RNG is drawn (bit-identical
+anchor). **TRAIN-ONLY:** `build_env`'s `cost_rand_frac` defaults to 0.0 and only the train
+builders (`_spawn_train_env`, n_envs=1 builder) pass `CFG.cost_rand_frac`; every eval/val/test
+rollout keeps 0.0 → the equity-based metric is NEVER randomized.
+
+**Isolation PROVEN.** (1) `checks/check_cost_randomization.py`: off-by-default no-op, multiplier
+mean-held (0.997≈1.0) in [0.6,1.4], validation rejects <0/≥1/NaN/inf. (2) RULER PROOF: a test
+rollout of the stored anchor `f01_s42` is **byte-identical** to the anchor at BOTH
+`cost_rand_frac=0.0` AND `0.4` — eval/metric pinned regardless of the training knob. (3) turnover
+unit test still green (no regression). Guard + registry extended to `cost_rand_frac`.
+
+**PIN — `cost_rand_frac = 0.4` (U[0.6, 1.4]), pinned BEFORE launch (no result-tuning).**
+- *Mean held at 1.0* → the measured cost LEVEL (spread 0.0623 / slip 0.0030) is unchanged; only
+  its DISPERSION is learned against. This isolates cost-ROBUSTNESS, not a cost-level change.
+- *±40%* = the pre-committed band (doc-11 recommendation). Real XAUUSD spread varies intraday/
+  by regime by well more than ±40%, so it's a moderate, plausible regularization strength.
+- *Hypothesis:* a policy over-fit to the exact pinned cost is brittle; training against a cost
+  band should regularize toward cost-robust (→ regime-robust) policies, raising val-transfer
+  (shrinking train+val−) and — the goal — improving per-fold CONSISTENCY (A/B #1's failing leg).
+  Secondary: flips are cost-sensitive, so churn may fall (measurable via flip%).
+- *Pre-committed reads (no mid-run tuning):* median beats anchor + Wilcoxon consistency + eligibility
+  held → extend to 5-seed finalist; no effect (median≈anchor, transfer quadrant unchanged) →
+  cost-robustness isn't the lever, move to A/B #3; worse → band too wide, retry 0.2 or conclude.
+
+**Launch:** `COST_RAND_FRAC=0.4 run_baseline.py --label costrand-p40 --seeds 42,43,44
+--concurrency 2 --candidate` — 75 jobs, ~5.4h. Same folds/budgets/gate as the anchor; ONLY
+`cost_rand_frac` differs. Lockbox sealed. On completion: `ab_report` vs anchor (ship preview) +
+transfer diagnostics (train+val− quadrant, flip%). **STOP after the 3-seed report for sign-off.**
+
