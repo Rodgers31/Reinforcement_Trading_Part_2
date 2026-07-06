@@ -1,0 +1,169 @@
+RT cost bar (ATR units): 0.0683
+p* canon: 0.5342
+p* modal: 0.2585
+Loading data (anchor-identical path)…
+All 25 re-derived fold boundaries match make_sliding_folds. Widening arm qualifies: 15 folds.
+Building labels…
+fold  1/25 done (28 rows, 34s elapsed)
+fold  2/25 done (28 rows, 60s elapsed)
+fold  3/25 done (28 rows, 91s elapsed)
+fold  4/25 done (28 rows, 125s elapsed)
+fold  5/25 done (28 rows, 156s elapsed)
+fold  6/25 done (28 rows, 183s elapsed)
+fold  7/25 done (28 rows, 209s elapsed)
+fold  8/25 done (28 rows, 236s elapsed)
+fold  9/25 done (28 rows, 262s elapsed)
+fold 10/25 done (28 rows, 289s elapsed)
+fold 11/25 done (42 rows, 331s elapsed)
+fold 12/25 done (42 rows, 370s elapsed)
+fold 13/25 done (42 rows, 409s elapsed)
+fold 14/25 done (42 rows, 449s elapsed)
+fold 15/25 done (42 rows, 488s elapsed)
+fold 16/25 done (42 rows, 528s elapsed)
+fold 17/25 done (42 rows, 568s elapsed)
+fold 18/25 done (42 rows, 608s elapsed)
+fold 19/25 done (42 rows, 648s elapsed)
+fold 20/25 done (42 rows, 688s elapsed)
+fold 21/25 done (42 rows, 727s elapsed)
+fold 22/25 done (42 rows, 765s elapsed)
+fold 23/25 done (42 rows, 805s elapsed)
+fold 24/25 done (42 rows, 845s elapsed)
+fold 25/25 done (42 rows, 885s elapsed)
+{
+  "rt_cost_atr": 0.0683,
+  "p_star": {
+    "canon": 0.53415,
+    "modal": 0.2585375
+  },
+  "harness": {
+    "shuffle_median_ic": 0.0005768479144264581,
+    "shuffle_median_auc": 0.4968436597436607,
+    "pass": true
+  },
+  "verdict_configs": {
+    "fwd4|ridge": {
+      "n_folds": 25,
+      "ic_median": 0.016507499977777146,
+      "ic_pos_folds": 18,
+      "sign_consistent": true,
+      "era_capture_q5": {
+        "1": 0.11975998282427647,
+        "2": 0.14872683084973964,
+        "3": 0.09984343935205009,
+        "4": 0.05760865026041967
+      },
+      "eras_clearing_cost": 3,
+      "clears_2plus_eras": true
+    },
+    "fwd4|hgb": {
+      "n_folds": 25,
+      "ic_median": 0.030203744132975923,
+      "ic_pos_folds": 19,
+      "sign_consistent": true,
+      "era_capture_q5": {
+        "1": 0.06539584746684801,
+        "2": 0.18101327878840207,
+        "3": 0.10129828288771248,
+        "4": 0.010853922219637891
+      },
+      "eras_clearing_cost": 2,
+      "clears_2plus_eras": true
+    },
+    "br_canon_long|logit": {
+      "n_folds": 25,
+      "auc_median": 0.5157134854446521,
+      "era_auc": {
+        "1": 0.5156682008078226,
+        "2": 0.5197684410925578,
+        "3": 0.5192466576811385,
+        "4": 0.4979812281259943
+      },
+      "sign_consistent": false,
+      "era_topdec_tp_rate": {
+        "1": 0.5054945054945055,
+        "2": 0.5092595297210457,
+        "3": 0.5358094603597602,
+        "4": 0.4925373134328358
+      },
+      "eras_clearing_cost": 1,
+      "clears_2plus_eras": false
+    },
+    "br_canon_long|hgb": {
+      "n_folds": 25,
+      "auc_median": 0.5334430241700271,
+      "era_auc": {
+        "1": 0.539837491434777,
+        "2": 0.5399350202139532,
+        "3": 0.5308766755470884,
+        "4": 0.5054989562388741
+      },
+      "sign_consistent": true,
+      "era_topdec_tp_rate": {
+        "1": 0.5509978425026969,
+        "2": 0.5508096497025776,
+        "3": 0.5502465318402139,
+        "4": 0.53125
+      },
+      "eras_clearing_cost": 3,
+      "clears_2plus_eras": true
+    },
+    "br_canon_short|logit": {
+      "n_folds": 25,
+      "auc_median": 0.5131327328155928,
+      "era_auc": {
+        "1": 0.5191976427345371,
+        "2": 0.5083666520620156,
+        "3": 0.5210579071835069,
+        "4": 0.5057045253213238
+      },
+      "sign_consistent": false,
+      "era_topdec_tp_rate": {
+        "1": 0.530544309491678,
+        "2": 0.4999130709657025,
+        "3": 0.5353219213081246,
+        "4": 0.5229357798165137
+      },
+      "eras_clearing_cost": 1,
+      "clears_2plus_eras": false
+    },
+    "br_canon_short|hgb": {
+      "n_folds": 25,
+      "auc_median": 0.5315399605139699,
+      "era_auc": {
+        "1": 0.5355317890578941,
+        "2": 0.5401986606161218,
+        "3": 0.5219746306406348,
+        "4": 0.5286394588566918
+      },
+      "sign_consistent": true,
+      "era_topdec_tp_rate": {
+        "1": 0.5297408449000575,
+        "2": 0.5639487270785116,
+        "3": 0.49521303258145366,
+        "4": 0.5290322580645161
+      },
+      "eras_clearing_cost": 1,
+      "clears_2plus_eras": false
+    }
+  },
+  "widening": {
+    "fwd4|ridge": {
+      "n_folds": 15,
+      "ic_median_5y": 0.01216355836762297,
+      "ic_median_10y": 0.009935926996364183,
+      "wilcoxon_p": 0.359130859375,
+      "folds_improved": 8
+    },
+    "fwd4|hgb": {
+      "n_folds": 15,
+      "ic_median_5y": 0.020654281508416132,
+      "ic_median_10y": 0.03090382432902993,
+      "wilcoxon_p": 0.1688232421875,
+      "folds_improved": 10
+    }
+  },
+  "verdict": "CEILING-CLEARS"
+}
+
+VERDICT (pinned rules): CEILING-CLEARS
+Total runtime: 885s

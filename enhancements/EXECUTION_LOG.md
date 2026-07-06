@@ -1272,3 +1272,44 @@ stands on ~18.5y of walk-forward coverage, so "more data" now has a no-new-instr
 (wider per-fold train windows) that this arm measures directly.
 
 **Runtime plan:** ~910 sklearn fits (25 folds × 28 + widening arm), CPU-only, ~30–60 min local.
+
+### Task 22 RESULTS — VERDICT: `CEILING-CLEARS` (answer (b), with an era asterisk)  ✅ (2026-07-05)
+
+Probe ran clean: 25/25 fold boundaries asserted identical to the anchor's; 910 real + 350
+shuffled fits in 885s; **harness gate PASS** (shuffle median IC +0.0006, AUC 0.4968; per-fold
+noise band IC ±0.05); 0 NaN metrics; full report **`enhancements/08-supervised-edge-ceiling-probe.md`**.
+
+**Signal exists and clears the 0.0683-ATR bar — selectively and era-unevenly.**
+| config (5y) | E1 | E2 | E3 | E4 | verdict-rule outcome |
+|---|---|---|---|---|---|
+| fwd4·ridge top-q5 capture | **0.120** | **0.149** | **0.100** | 0.058 | clears 3/4 eras; IC>0 in 18/25 folds |
+| fwd4·HGB top-q5 capture | 0.065 | **0.181** | **0.101** | 0.011 | clears 2/4 eras; 19/25 |
+| canon-long·HGB top-decile TP (p\*=.5342) | **.551** | **.551** | **.550** | .531 | clears 3/4 eras |
+- All-bar capture 0.028–0.041 = **sub-cost even gross** → only top-quintile-selective trading
+  clears (IC_req for all-bar ≈ 0.052–0.059 vs observed 0.02–0.03).
+- **E4 (2020-07→2024-01) clears NOWHERE at 5y** — the deployment-adjacent era is the dead one.
+- Secondary: fwd8·ridge clears **all 4 eras** (E4 0.076); modal bracket has the best AUC (0.63)
+  but never clears its p\*=0.2585 (top-decile 0.15–0.24) — ranking ≠ clearing.
+- Transfer gap mirrors RL: HGB train IC **0.577** → OOS **0.030** (E4 ratio −0.6%); signal lives
+  in micro-seasonality/candle-shape features (dow_cos −0.028, tod_cos +0.020, lower_wick −0.019).
+- **Widening arm (pinned, neutral overall: p=0.17/0.36) rescues E4 specifically:** HGB q5-capture
+  0.011→**0.146**, folds clearing 2/7→**6/7**, ΔIC +0.018 with 7/7 improving (post-hoc era read,
+  flagged in 08 §8). E4 5y-death is substantially a **train-window artifact, not secular decay**.
+- **Extraction gap (vs anchor RL per era):** ceiling 0.120/0.181/0.101/0.058 vs anchor median ret
+  −1.9%/+7.2%/−5.3%/−2.7% — PPO profits only where the ceiling is 2.6× cost, loses in two eras a
+  fixed sklearn model cleared. Bottleneck = unselective extraction + memorization, not no-signal.
+
+**Recommendation (08 §7):** stopping rule NOT invoked (pinned NULL branch not taken).
+Branch-B: **RL A/B #4 = 10y train window** (folds 11–25, same val/test grid, ship rule unchanged
+— the only lever with measured supervised support, zero new data); pooling path continues per
+enh/07 with a **pooled-supervised-probe go/no-go inserted into Phase-0** (if pooled ceiling
+doesn't beat single-instrument in E3+E4 → invoke stopping rule WITHOUT the build; needs
+ratification). Mandatory E4-subset reporting for all future candidates (reporting only, not a
+gate). Doc-02 "limited data" context correction recorded (08 §6): rationale predates the
+2026-07-02 backbone switch by one day; anchor stands on 18.0y coverage — pooling's case is
+regularization + decay-testing, not scarcity.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| (research probe — no training run) | — | — | — | **CEILING-CLEARS** | supervised ceiling clears cost E1–E3 @5y, E4 rescued @10y; RL extraction is the bottleneck; next: A/B #4 (10y) + pooled-probe Phase-0 gate |
