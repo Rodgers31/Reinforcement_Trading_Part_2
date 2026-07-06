@@ -1169,3 +1169,21 @@ cost/turnover side.**
 |---|---|---|---|---|---|
 | flip-aware (pen 0.045, entry_frac 0) | 42,43,44 | +0.027 | p=0.75 | **NO SHIP** | flip% 35→8 but net −6.7k (fresh-churn substitution); selectivity refuted; benefit needs broad turnover cut |
 
+---
+
+## Task 21 — Phase-C STRATEGIC REASSESSMENT (reviewer: step back)  ✅ (2026-07-05)
+
+After 3 A/Bs all NO SHIP, the reviewer chose to reassess rather than run A/B #4. Full memo:
+**`enhancements/07-phase-c-strategic-reassessment.md`**. Key conclusions:
+- The 3 A/Bs empirically confirmed the #1 weakness = **thin-signal transfer failure** (not
+  reward/cost), and that reward/cost shaping only trims cost drag on a near-zero-edge system.
+- The docs already prescribed the fix: **multi-instrument pooling** (doc 03 §3.7d "biggest
+  data-based defense"; doc 02 §1 "strongest available regularizer") — UNTRIED, and blocked on data
+  (XAUUSD only, verified).
+- **Recommendation:** pursue doc-02 pooling, de-risked by acquiring XAGUSD (+ maybe an FX major) and
+  running the ½-day Phase-0 similarity diagnostic BEFORE the ~1–2-week build; do NOT run more
+  reward/cost A/Bs (exhausted). **Pre-committed stopping rule:** pooling is the LAST major lever; if
+  it doesn't ship under the ratified rule, accept the honest negative result.
+- Anchor −0.526 stands; running-best unchanged; no training run for the reassessment.
+**Awaiting reviewer direction on the data-acquisition / pooling path.**
+
