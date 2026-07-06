@@ -1313,3 +1313,67 @@ regularization + decay-testing, not scarcity.
 | change | seeds | Δmedian | Wilcoxon | decision | notes |
 |---|---|---|---|---|---|
 | (research probe — no training run) | — | — | — | **CEILING-CLEARS** | supervised ceiling clears cost E1–E3 @5y, E4 rescued @10y; RL extraction is the bottleneck; next: A/B #4 (10y) + pooled-probe Phase-0 gate |
+
+---
+
+## Task 23 — SUPERVISED BASELINE THROUGH THE HONEST RULER — protocol PINNED (pre-launch, 2026-07-05)
+
+**Reviewer ratifications received (2026-07-05):** (1) pooled-probe go/no-go inserted into pooling
+Phase-0 (enh/08 §7.2); (2) **mandatory E4-subset (f19–25) reporting for all future candidates.**
+Task-22 commits pushed (`209179b..71d7529`).
+
+**Reviewer direction:** BEFORE A/B #4, convert the Task-22 ceiling into the anchor's own units —
+run the supervised strategy through the honest ruler (research-only) to (a) test whether the
+ceiling survives deployment mechanics (single position, compounding, MTM DD, gates) and (b) set
+the benchmark any RL candidate must beat to justify its complexity. **STOP for review after the
+deliverable; A/B #4 does not launch in this task.**
+
+**Scope guard (hard):** research-only. No RL training, no env/config change, no data downloads,
+anchor and running-best untouched, **no run-registry/INDEX row** (not a training run), lockbox
+untouched (identical frame/label construction to Task 22). Script + outputs in
+`enhancements/09_probe/`; deliverable `enhancements/09-*.md`.
+
+### Pinned protocol (fixed BEFORE any simulation is run)
+
+**Exactly two variants — no parameter search, failures reported as plainly as passes.**
+Score = **fwd4·ridge exactly as Task 22**: per fold, StandardScaler fit on TRAIN +
+`Ridge(alpha=1.0)`, trained on the fold's train-window rows with non-NaN fwd4 label; selection
+threshold = q80 of |train predictions| (train-derived, no test peeking). Trade only test bars with
+|score| ≥ threshold; direction = sign(score).
+
+- **V1 (time exit):** enter at the selected H1 bar's close; exit at the close of the **4th bar**
+  after entry (k=4); if the test window ends first, exit at the final bar close (`eow`).
+- **V2 (canonical bracket):** same entries; SL = entry − dir×**1.0×ATR_entry**, TP = entry +
+  dir×**1.0×ATR_entry** (TP=1R, distances from ENTRY price, mirroring `_open_position`);
+  H1 touch scan over bars t+1…t+24: gap-through at open fills at the OPEN (N1 mirror, reasons
+  `SL_gap`/`TP_gap`); both TP and SL touched in one bar → **SL first** (env's pessimistic
+  convention; ambiguous-bar count REPORTED as the fidelity bound vs the env's M1 fills);
+  no touch by t+24 → time exit at that close (`timeout`); window end → `eow`.
+
+**Mechanics (both variants, mirroring the env's formulas exactly):** one position at a time, no
+pyramiding, no flips; per bar exits are processed first, then entry if flat and selected
+(same-bar re-entry after an exit is allowed). Entry price = close + dir×half_cost; exit price =
+raw − dir×half_cost; half_cost = (spread_atr_frac/2 + slippage_atr_frac)×ATR_entry =
+0.03415×ATR_entry (BOTH legs at entry-bar ATR, as in `_entry_price`/`_exit_price`); commission
+$0.01/trade; **sizing = anchor's fixed-fractional**: units = equity×0.005/(1.0×ATR_entry) (risk
+unit = 1×ATR for both variants). Per-fold equity starts at 10,000; equity_mtm per bar = realized
+equity + unrealized at that bar's close.
+
+**Ruler reuse (the anchor's exact functions, unmodified):** per-fold `evaluate.full_report`
+(periods_per_year=6003) → per-fold return/PF/trade-Sharpe/MTM-DD; `run_baseline._stitch` →
+stitched OOS curve; `eval_harness.metric_return_over_mtm_dd` → THE metric;
+`train_ppo._passes_consistency_gate` → deployment gate. Supervised fits are deterministic —
+no seed dimension (noted vs the anchor's median-of-5).
+
+**Arms and comparisons:**
+- 5y arm: all 25 anchor folds → headline vs anchor **−0.5260**.
+- 10y arm: folds 11–25 (Task-22-validated widened boundaries: same val/test, t0 −5y).
+- Anchor sub-metrics for fair same-fold comparison: re-stitch the anchor's own per-job
+  `test_equity.csv` per seed over folds 11–25 and 19–25 → median-of-5.
+- **E4 subset (f19–25) reported for every variant** (per the ratified reporting rule), plus
+  per-era fold-metric medians E1–E4.
+- Diagnostics: n_trades, win rate, exit-reason mix, cost/gross, selected-bar fraction,
+  in-position skip rate, both-touch ambiguity count (V2).
+
+**Verdict question (pre-committed):** does selective supervised trading clear the ruler where PPO
+couldn't — metric > anchor's −0.5260 (and vs 0 = break-even), gate legs, and does it hold in E4?
