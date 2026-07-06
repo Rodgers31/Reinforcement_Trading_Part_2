@@ -1127,3 +1127,45 @@ cost-randomization unit test still green. run_info + registry record the knob.
 Same folds/budgets/gate; only the turnover mechanism differs (flat→flip-aware). Lockbox sealed.
 On completion: `ab_report` vs anchor + consistency/flip% comparison vs A/B #1. **STOP for sign-off.**
 
+---
+
+## Task 20 — A/B #3: flip-aware turnover — NO SHIP; selectivity REFUTED, benefit is BROAD turnover  ✅ (2026-07-05)
+
+Run `20260705-164152_753beea_turnover-flipaware-p045`: 75/75 jobs, all
+`turnover_penalty_r=0.045 / turnover_entry_frac=0.0 / cost_rand_frac=0.0` (parity verified),
+running-best UNCHANGED. The penalty engaged HARD (flip% 35→8) but the net benefit evaporated.
+
+### Three-way (shared 3 seeds {42,43,44})
+| run | median-3 | total trades | flip% | cost/gross | net cash | vs-anchor consistency |
+|---|---|---|---|---|---|---|
+| anchor | −0.528 | 25,419 | 35.4 | 111% | −5,782 | — |
+| **A/B#1 flat 0.045** | **+1.281** | **12,805** | 25.1 | **68%** | **+13,076** | 44:31, p=0.030 |
+| **A/B#3 flip-only** | −0.499 | 21,243 | **8.1** | 118% | −6,695 | 39:36, **p=0.751** |
+
+Ship rule 1/4 (Δmedian +0.027, Wilcoxon p=0.75); **SHIP preview = False.**
+
+### CONCLUSION — flip-selectivity REFUTED; the turnover lever is a BROAD cost play
+Taxing ONLY flips crushed the flip fraction (35→8%) but the agent **substituted fresh-entry
+churn** — total trades fell only 16% (vs the flat penalty's 50%), so cost/gross stayed at 118%
+(no better than anchor) and net stayed negative. **A/B #1's +$13k came from halving TOTAL trades
+(→ halving cost drag), not from cutting flips specifically**, and that broad reduction cannot be
+targeted: spare any trade type and the churn migrates there. Consistency also did not improve
+(39:36, p=0.75). This confirms the pre-committed "benefit needed the broad tax" read.
+
+### Phase-C synthesis (3 A/Bs, all NO SHIP; anchor −0.526 stands)
+- **#1 turnover flat:** net +$13–28k by halving total turnover (cost drag) — but inconsistent
+  (broad suppression hurts ~40% of folds); no flat level fixes it.
+- **#2 cost-rand:** null (transfer isn't cost-driven).
+- **#3 flip-aware:** refuted — the turnover benefit is *total* cost reduction, entangled with the
+  over-suppression; it can't be made selective.
+→ The reward/cost side is largely exhausted: reducing turnover just trims COST drag on a
+near-zero-edge system (per the trust investigation, no real OOS edge). The net-vs-consistency
+tension is fundamental to a cost play. **The remaining unexplored lever is the EDGE itself —
+representation/features/regularization (attack the thin signal + train+val− overfitting), not the
+cost/turnover side.**
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| flip-aware (pen 0.045, entry_frac 0) | 42,43,44 | +0.027 | p=0.75 | **NO SHIP** | flip% 35→8 but net −6.7k (fresh-churn substitution); selectivity refuted; benefit needs broad turnover cut |
+
