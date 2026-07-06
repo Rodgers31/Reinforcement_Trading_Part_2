@@ -1187,3 +1187,88 @@ After 3 A/Bs all NO SHIP, the reviewer chose to reassess rather than run A/B #4.
 - Anchor −0.526 stands; running-best unchanged; no training run for the reassessment.
 **Awaiting reviewer direction on the data-acquisition / pooling path.**
 
+
+---
+
+## Task 22 — SUPERVISED EDGE-CEILING PROBE — protocol PINNED (pre-launch, 2026-07-05)
+
+**Reviewer direction (2026-07-05):** before any pooling build, run a research-only supervised
+probe on the EXISTING XAUUSD data to decide between (a) no cost-clearing signal exists in the 25
+features at all vs (b) signal exists but is too thin/unstable for the RL layer to extract. This
+sharpens the enh/07 branch decision: if (a), invoke the stopping rule WITHOUT the pooling build.
+
+**Scope guard (hard):** research-only. No RL training, no env/config/feature changes, no data
+downloads, no lockbox access (feature frame truncated at `lockbox_start_date=2024-07-01` before
+labels exist), anchor and running-best untouched, no run-registry row / INDEX row (this is not a
+training run). Script + outputs live in `enhancements/08_probe/`; deliverable is
+`enhancements/08-*.md`.
+
+### Pinned protocol (everything below fixed BEFORE any label or metric is computed)
+
+**Data / folds / features — exact anchor reuse.** `train_ppo._load_decision_features()` (same M1
+CSV → H1 resample → `prepare_feature_frame`, start 2006-01-01) → `make_sliding_folds(feat, 5y/6m/
+6m/6m, embargo 200, lockbox 2024-07-01)`. Assert **25 folds** (identical to the anchor's). Inputs =
+the **25 market feature columns** from `features.py` only (no position-state features). Supervised
+fits use each fold's TRAIN window only; metrics reported on its TEST window (val untouched, mirrors
+the RL ruler's OOS unit). Entries sampled at EVERY H1 bar of the window.
+
+**Labels.**
+1. *k-bar forward return, ATR-normalized:* `y = (Close[t+k] − Close[t]) / ATR[t]`, **k ∈ {2, 4, 8}**
+   — pinned to the anchor's OOS holding-time distribution measured 2026-07-05 from the 125
+   `test_trades.csv` (42,234 trades): `bars_in_trade` p25/p50/p75 = 2/4/8. **k=4 (median hold) is
+   the primary regression config.**
+2. *Bracket-aligned TP-before-SL within horizon H=24 bars (~1 trading day):* brackets hung off
+   mid `Close[t] ± mult×ATR[t]` (cost handled in the clearance bar, not the label):
+   — *canonical* SL=1.0×ATR, TP=1R (PRIMARY; fastest-resolving, balanced classes);
+   — *modal-anchor* SL=2.0×ATR, TP=3R (secondary; the anchor's most-chosen bracket, 14.4% of trades).
+   Long AND short labels. H1 High/Low touch scan; both-touched-in-same-bar → SL first (env's
+   pessimistic convention); no touch within H → label 0 ("TP not reached first"). Label horizons
+   (≤24 bars) never cross the 200-bar embargo, so train labels cannot touch val/test bars.
+
+**Models (fixed hyperparameters, zero tuning anywhere).** Regression: `Ridge(alpha=1.0)` on
+train-fit standardized features; `HistGradientBoostingRegressor(max_iter=200, learning_rate=0.08,
+min_samples_leaf=50, l2_regularization=1.0, early_stopping=False, random_state=0)` (lightgbm not
+installed; sklearn 1.6.1). Classification: `LogisticRegression(C=1.0, max_iter=1000)` standardized;
+`HistGradientBoostingClassifier(same params)`.
+
+**Per-fold metrics.** Regression: OOS Spearman IC; TRAIN in-sample IC (supervised transfer gap —
+mirrors the RL train+val− quadrant); gross capture in ATR units `mean(y·sign(pred))` for (a) all
+bars, (b) top-|pred| quintile with the quintile threshold taken from TRAIN predictions (no test
+peeking). Classification: OOS AUC; base rate; TP-first rate of the top-decile-by-prob bars
+(decile threshold from TRAIN predictions). **Shuffled-label control:** per (fold × config), refit
+on train labels permuted with `seed=1000+fold`; OOS IC must be ~0 / AUC ~0.5 (harness-integrity
+gate: shuffled medians outside IC ±0.02 / AUC 0.48–0.52 → fix harness before interpreting).
+
+**Era-stability.** Eras pinned as consecutive fold quartiles by test-window start: E1=f01–06,
+E2=f07–12, E3=f13–18, E4=f19–25 (calendar spans reported). Note for the doc: OOS coverage is
+~2011H2→2024H1 (the anchor's full ruler span); 2006–2011 exists only as training history under
+this scheme — walk-forward coverage of the backbone is ~18.5y.
+
+**Cost-clearance bar (measured, from config — never tuned).** Round-trip = `spread_atr_frac +
+2×slippage_atr_frac = 0.0623 + 0.0060 = 0.0683×ATR` (commission $0.01/trade ignored, ~1bp of the
+per-trade risk budget). k-strategy clears when per-trade gross capture ≥ **0.0683** (y is already
+in ATR units; non-overlapping entries every k bars ⇒ one RT cost per k-bar trade). Bracket clears
+when TP-first rate ≥ p\* = (b + 0.0683)/(a + b) in SL-distance/ATR units: canonical p\* =
+1.0683/2 = **0.5342** (driftless base ≈ 0.50); modal p\* = 2.0683/8 = **0.2585** (base ≈ 0.25).
+
+**Verdict rules (pre-committed).** Verdict configs = {k=4 ridge, k=4 HGB, canonical-bracket
+logistic L/S, canonical-bracket HGB L/S}. Sign-consistency = OOS IC>0 in ≥18/25 folds (binomial
+p≈0.022) or era-median AUC ≥0.53 in ≥2 eras.
+- **NULL (case a):** no verdict config achieves sign-consistency AND no config clears cost
+  (era-median top-quintile capture ≥0.0683, or era-median top-decile TP-rate ≥ p\*) in ≥1 era →
+  recommend invoking the enh/07 stopping rule WITHOUT the pooling build.
+- **THIN-BUT-REAL (case b-thin):** sign-consistency somewhere, but cost clearance in <2 of 4 eras →
+  branch-B comparison (pooling vs per-fold train-window widening) decides next step.
+- **CEILING-CLEARS (case b):** some verdict config clears cost in ≥2 of 4 eras → signal exists;
+  RL extraction is the bottleneck; branch-B options are live.
+Secondary configs (k∈{2,8}, modal bracket, univariate per-feature IC screen) are diagnostic only —
+they cannot flip a NULL.
+
+**Widening arm (branch-B evidence, runs regardless of verdict).** Same protocol with 10y train
+windows (t0 pulled back 5y; same val/test windows) on the folds where 10y history exists (~f11+);
+paired per-fold OOS IC 5y-vs-10y, Wilcoxon. Context to record in 08: doc 02's pooling rationale
+("limited data") predates the 2026-07-02 switch to the 23-year backbone — the anchor already
+stands on ~18.5y of walk-forward coverage, so "more data" now has a no-new-instrument variant
+(wider per-fold train windows) that this arm measures directly.
+
+**Runtime plan:** ~910 sklearn fits (25 folds × 28 + widening arm), CPU-only, ~30–60 min local.
