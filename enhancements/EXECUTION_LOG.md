@@ -1377,3 +1377,40 @@ no seed dimension (noted vs the anchor's median-of-5).
 
 **Verdict question (pre-committed):** does selective supervised trading clear the ruler where PPO
 couldn't — metric > anchor's −0.5260 (and vs 0 = break-even), gate legs, and does it hold in E4?
+
+### Task 23 RESULTS — supervised baseline CLEARS the ruler in 1 of 4 cells (V1·10y); gate still FAILS; STOPPED for review  ✅ (2026-07-05)
+
+Ran in 11s, deterministic (no seeds). **Ruler reuse PROVEN:** re-stitching the anchor's own 125
+`test_equity.csv` through the identical function chain reproduced the ratified per-seed metrics
+(full-25 median −0.5260, <5e-4 per seed). Anchor sub-medians: **−0.7800** (f11–25), **−0.6606**
+(f19–25). Full report: **`enhancements/09-supervised-baseline-honest-ruler.md`**.
+
+| cell | folds | metric | return | PF | gate | E4 metric/return |
+|---|---|---|---|---|---|---|
+| anchor RL | 1–25 | −0.5260 | — | — | 0/5 | −0.66 / — |
+| V1·5y time-exit | 1–25 | −0.0159 | −0.8% | 1.009 | FAIL 14/25 | −0.26 / −8.6% |
+| V2·5y bracket | 1–25 | −0.9676 | −85.3% | 0.895 | FAIL 3/25 | −0.85 / −45.0% |
+| anchor RL | 11–25 | −0.7800 | — | — | — | −0.66 |
+| V1·5y | 11–25 | +0.0277 | +1.3% | 1.009 | — | −0.26 / −8.6% |
+| **V1·10y** | 11–25 | **+4.2626** | **+126.2%** | **1.113** | **FAIL: PF-floor 0.82<0.90 (breadth 11/15 OK, Sharpe +0.75 OK)** | **+5.43 / +80.3%** |
+| V2·10y | 11–25 | −0.7247 | −43.1% | 0.952 | FAIL 5/15 | −0.48 / −17.6% |
+
+**Findings:** (1) the enh/08 widening rescue CONVERTS to money through the honest ruler — same
+folds, same entries, 5y→10y flips +1.3%→+126.2%, E4 −8.6%→+80.3%, cost/gross 94%→56%, 11/15
+folds positive (not outlier-driven; weak era = E3, as the probe predicted). (2) **Execution
+geometry dominates:** identical entries under canonical brackets are destroyed (cost/gross 532%
+@5y; 50/50 SL:TP coin-flip vs the 53.4% the bracket needs; both-touch ambiguity only 1.7% — the
+pessimistic fill convention is NOT the cause). The env's bracket-mandatory action space makes the
+one execution mode the signal supports (time exit) the hardest to learn — pre-written post-mortem
+for A/B #4 if it fails. (3) No cell passes the ratified gate — V1·10y fails only the PF floor
+(f24 0.80/f16 0.81/f18 0.84); it is a **benchmark, not a deployment**. V1·5y ≈ 0 quantifies the
+probe→deployment conversion loss (single-position skips 45% of selected bars; compounding; DD).
+
+**Benchmark set for A/B #4 (folds 11–25): anchor −0.78; supervised V1·10y +4.26.** An RL
+candidate that ships under the ratified rule but lands far below +4.26 has not justified its
+complexity over a 26-line deterministic ridge rule.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| (research probe — no training run) | n/a (deterministic) | — | — | **BENCHMARK SET; STOP FOR REVIEW** | V1·10y +4.26/+126% clears ruler where PPO scored −0.78 (E4 +5.43); V2 bracket-execution destroys same signal; all gates FAIL (V1·10y: PF-floor only); A/B #4 NOT launched |
