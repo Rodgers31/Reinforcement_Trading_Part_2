@@ -304,3 +304,25 @@ if _tef_override is not None:
             f"Invalid TURNOVER_ENTRY_FRAC={_tef_override!r}; expected a float fraction "
             f"(e.g. 0.0 = tax flips only)") from exc
     # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.
+
+# Sliding train-window width (Phase-C A/B #4): a CANDIDATE run may widen the
+# per-fold train window via SLIDING_TRAIN_YEARS without changing the committed
+# anchor default (5.0). With 10.0 the sliding grid yields 15 folds whose
+# val/test windows are BY CONSTRUCTION identical to the 5y grid's folds 11-25
+# (t0_j + 120m == t0_{j+10} + 60m) — only the train window widens; the honest
+# ruler (test windows, cost, metric, gate) is untouched. Guarded in
+# run_baseline (non-anchor value requires --candidate) and stamped into the
+# run registry for audit. Unset env var -> anchor grid reproduced.
+_sty_override = _os.environ.get("SLIDING_TRAIN_YEARS")
+if _sty_override is not None:
+    try:
+        CFG.sliding_train_years = float(_sty_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid SLIDING_TRAIN_YEARS={_sty_override!r}; expected years as a "
+            f"float (e.g. 10.0)") from exc
+    # This knob shapes fold construction (no env-side validation path): enforce here.
+    if not (CFG.sliding_train_years == CFG.sliding_train_years
+            and 0.5 <= CFG.sliding_train_years <= 20.0):
+        raise ValueError(
+            f"SLIDING_TRAIN_YEARS={CFG.sliding_train_years} out of sane range [0.5, 20]")

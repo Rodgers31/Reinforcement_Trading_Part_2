@@ -85,8 +85,14 @@ def derive_boundaries(idx):
     return out
 
 
-def simulate(te: pd.DataFrame, scores: np.ndarray, thr: float, variant: str):
-    """One test window, one variant. Returns (equity_df, trades_df, diag)."""
+def simulate(te: pd.DataFrame, scores: np.ndarray, thr: float, variant: str,
+             sl_mult: float = SL_MULT, tp_r: float = TP_R):
+    """One test window, one variant. Returns (equity_df, trades_df, diag).
+
+    sl_mult/tp_r default to the canonical bracket (Task-23 pin) so V1/V2 cells
+    are byte-identical to the committed run; the Task-24 V3 diagnostic passes
+    the modal bracket (2.0, 3.0). Sizing always uses the ACTUAL SL distance
+    (env formula)."""
     o = te["Open"].to_numpy(float)
     h = te["High"].to_numpy(float)
     l = te["Low"].to_numpy(float)
@@ -156,11 +162,11 @@ def simulate(te: pd.DataFrame, scores: np.ndarray, thr: float, variant: str):
             atr_e = max(atr[i], 1e-12)
             entry = c[i] + d * HALF_COST_ATR * atr_e
             risk = max(equity * RISK_FRAC, 1e-8)
-            units = risk / (SL_MULT * atr_e)
+            units = risk / (sl_mult * atr_e)
             pos = {"dir": d, "entry": entry, "mid": c[i], "units": units,
                    "risk": risk, "atr_e": atr_e, "i": i, "t": times[i],
-                   "sl": entry - d * SL_MULT * atr_e,
-                   "tp": entry + d * TP_R * SL_MULT * atr_e}
+                   "sl": entry - d * sl_mult * atr_e,
+                   "tp": entry + d * tp_r * sl_mult * atr_e}
         elif pos is not None and selected[i] and i != pos["i"]:
             skipped_in_pos += 1
         # 3) window end
