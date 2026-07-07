@@ -1552,3 +1552,80 @@ unjustified under the ratified rule.
 | change | seeds | Δmedian | Wilcoxon | decision | notes |
 |---|---|---|---|---|---|
 | A/B #4 sliding_train_years 5→10 (folds 11–25) | 42,43,44 | +0.2099 (vs −0.8177 sub-anchor) | p=0.248 | **NO SHIP (preview); STOP FOR REVIEW** | below V3 bracket ceiling +1.69 and V1 +4.26; E4 −0.66→−0.09; reading #3: exit/action-space learnability next; 5-seed extension implausible under rule |
+
+### Task 24 — reviewer decision: A/B #4 preview NO-SHIP ACCEPTED; NO 5-seed extension  (2026-07-07)
+
+Reviewer accepted the 3-seed preview NO-SHIP as final for A/B #4. **Extension declined on the
+recorded implausibility math** (restated for the record): at the finalist stage the comparator
+hardens from −0.8177 (3-seed sub-anchor) to **−0.7800** (5-seed), so leg (a) would need the
+5-seed candidate median ≥ **−0.57** — i.e. BOTH new seeds (45, 46) landing above −0.57 while the
+existing three sit at −0.40/−0.61/−0.80 — AND leg (b) would need the paired Wilcoxon to move from
+**p=0.248 to p<0.01** on 75 pairs with the same fold pattern. Neither is plausible; extension
+would spend compute to confirm a NO-SHIP. Running-best unchanged; A/B #4 closed.
+
+---
+
+## Task 25 — A/B #5: entry-time HOLD-HORIZON COMMITMENT (final end-to-end RL attempt) — PINNED (pre-launch, 2026-07-07)
+
+**Reviewer direction:** per the Task-24 pinned lever (exit/action-space LEARNABILITY), one final
+end-to-end RL attempt: give the agent an explicit exit-timing head so the close discipline is a
+PARAMETER chosen at entry, not a behavior PPO must discover. Two tracks run in parallel: this
+A/B (Track 1) and the enhancements/11 supervised-hardening PROPOSAL (Track 2, write-only, no
+execution). STOP after both for combined review.
+
+### Mechanism (candidate-only; anchor path byte-identical when knob unset)
+- **Action space:** `MultiDiscrete([3, 3, 4])` → **`MultiDiscrete([3, 3, 4, 4])`** — 4th head =
+  hold-horizon choice **k ∈ {2, 4, 8, 24}** decision bars, committed at entry (menu = the
+  Task-22 pinned holding percentiles {2,4,8} + the V3 close-discipline horizon 24).
+- **Auto-flatten:** at the TOP of `step()` (before that bar's action is applied): if
+  `bars_in_trade ≥ hold_bars`, close at the current bar's close, exit-side half-cost at entry
+  ATR (manual-close pricing), new `exit_reason="horizon_close"`. Timing matches the Task-23/V3
+  convention exactly: brackets keep priority over the full M1 interior through bar t+k (the
+  existing fill loop runs unchanged); the flatten prices at close[t+k]; same-bar re-entry is
+  possible via the normal entry block (a fresh entry with fresh costs). Early exits (manual/flip)
+  remain allowed — k is a hard CEILING on holding time; a flip restarts the clock with the new
+  entry's chosen k.
+- **Brackets stay as protection:** SL/TP menu, sizing, costs, reward terms all UNCHANGED. No
+  reward-shape change — this is an architecture A/B.
+- **Observation:** position-state block gains ONE feature (6→7): remaining-hold fraction
+  `(hold_bars − bars_in_trade)/hold_bars` (0 when flat). Without it the sampled commitment would
+  be invisible to the policy/value net (memoryless MLP) — the learnability being tested requires
+  observing the commitment. Market features untouched. Anchor obs (knob off) byte-identical.
+- **Plumbing (established candidate pattern):** config knob `hold_horizon_bars: Tuple = ()`
+  (empty = anchor) + `HOLD_HORIZON_BARS` env-var hook; env validates canonically; `build_env`
+  passes it through; `run_baseline` fail-fast guard extended (non-empty menu requires
+  `--candidate`) + registry stamp. Trade log gains `hold_bars` column (chosen-k diagnostics).
+- **Pre-launch checks (`checks/check_ab5_hold_horizon.py`):** anchor parity (knob off → action
+  space (3,3,4), obs 31, hold branch dead); synthetic-data unit tests (flat prices, wide
+  brackets): horizon fires at exactly k bars with `horizon_close` reason + manual-close pricing;
+  brackets-first priority; flip restarts the clock; early manual close allowed; same-bar
+  re-entry after flatten; launcher guard refusal; config parse (valid/invalid).
+
+### Run pin
+`HOLD_HORIZON_BARS=2,4,8,24` + `SLIDING_TRAIN_YEARS=10`, **3M steps/fold UNCHANGED**, folds
+11–25 (the 10y grid, equivalence already asserted in Task 24), seeds {42,43,44} (3-seed
+preview), concurrency 2, label `ab5-holdhorizon-10y-3seed`, `--candidate`. Ship-rule evaluation
+via the Task-24 `ab4_report.py` verbatim (same folds, same anchor sub-stitch comparators
+−0.8177 3-seed / −0.7800 5-seed / E4 −0.6606, same pairing j↔j+10, ratified legs unchanged).
+E4 subset + per-era medians reported (ratified rule). 5-seed extension only on reviewer sign-off.
+
+### PRE-COMMITTED READINGS (verbatim from reviewer, recorded before any result)
+(i) **Ships vs anchor = necessary but not sufficient.**
+(ii) **≥ V3 +1.69 = evidence RL is learning the exit game.**
+(iii) **~ +4.26 = justifies RL complexity.**
+(iv) **TERMINAL RULE: if this fails, the end-to-end RL line is CLOSED as an architecture
+negative — future RL only as a hybrid (supervised signal in obs) research item.**
+
+### Known caveat + pre-defined follow-up permission (pinned BEFORE launch)
+3M steps over 10y underfits (A/B #4: eligible-eval fraction 0.386→0.272; train−val− quadrant
+→32%). A steps-scaled follow-up (6M steps, everything else identical) is permitted ONLY if A/B #5
+shows the **positive-but-underfit signature**, ALL of:
+1. SHIP_preview = False but **Δmedian > 0** (3-seed median above −0.8177);
+2. **eligible_eval_fraction ≤ 0.32**;
+3. **train−val− share ≥ 25%** of total eval sign counts;
+4. late-peaking diagnostic reported (share of jobs whose best eligible eval falls in the final
+   25% of that job's evals) — supporting evidence, NOT a gate leg.
+Any other failure shape → reading (iv) TERMINAL RULE fires with no follow-up.
+
+**Additional pinned diagnostics to report:** chosen-k distribution (trade-log `hold_bars`),
+`horizon_close` share of exits, flip%, eligibility, exit-reason mix vs A/B #4.
