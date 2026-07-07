@@ -14,3 +14,4 @@ Append-only. One line per full training run (see run_registry.py).
 | 2026-07-04 | 49a9ef9 | turnover-p022-3seed | -0.1687 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.022 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |
 | 2026-07-05 | c2eb933 | costrand-p40 | -0.5503 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.0 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |
 | 2026-07-05 | 753beea | turnover-flipaware-p045 | -0.4989 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.045 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |
+| 2026-07-07 | 4fa6046 | ab4-10y-3seed | -0.6078 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.0 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |

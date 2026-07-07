@@ -1505,3 +1505,50 @@ attribution BEFORE the RL result is known — the decision ladder on folds 11–
 - A/B #4 lands ≈ V3 (+1.7-ish) → bracket geometry is the binding loss vs +4.26 → action-space
   question (reading #2) with V3 as the measured bracket ceiling.
 - A/B #4 near +4.26 → reading #1 (RL justified) — it would have beaten every fixed rule.
+
+### Task 24 RESULTS — A/B #4 3-seed preview: NO SHIP (leg a −0.0001, leg b p=0.25); reading #3 branch with V3 refinement — STOPPED for review  ✅ (2026-07-07)
+
+Run `20260707-012025_4fa6046_ab4-10y-3seed`: **45/45 jobs**, ~9.8h compute, aggregate + INDEX row
+written (candidate convention), **running-best UNCHANGED**. Registry stamped
+`sliding_train_years: 10.0`; anchor parity + grid equivalence asserted pre-launch
+(`checks/check_ab4_widening.py` all PASS). Ship-rule evaluation:
+`runs/…/ab4_report.json` (bespoke fold j↔j+10 pairing, ratified legs imported unchanged).
+
+| seed | cand metric (f11–25) | ret | PF | anchor same-seed sub | seed-paired |
+|---|---|---|---|---|---|
+| 42 | −0.4044 | −18.7% | 0.984 | −0.9035 | improved |
+| 43 | −0.6078 | −36.1% | 0.961 | −0.8177 | improved |
+| 44 | −0.7997 | −54.7% | 0.929 | −0.4209 | REGRESSED |
+
+**Ship legs (3-seed preview):** (a) Δmedian +0.2099 vs −0.8177 → **FAIL by 0.0001**;
+(b) paired Wilcoxon p=0.2476, median paired Δ +0.038, 45 pairs → **FAIL** (the improvement is not
+fold-consistent); (c) 3/3 beat the anchor sub-median (informational at preview; seed-paired view
+is 2/3); (d) no gate regression → PASS (all gates FAIL both sides). **SHIP_preview = False.**
+**E4 (f19–25):** candidate median −0.0948 (per-seed −0.09/+0.56/−0.37) vs anchor −0.6606 —
+improved ≈+0.57 but still ≈0.
+
+**The pre-committed ladder (folds 11–25):**
+anchor RL −0.8177 → **A/B #4 PPO·10y −0.6078** → V3 bracket-expressible ceiling **+1.69** →
+V1 time-exit ceiling **+4.26**.
+
+**Reading applied (pinned before launch): #3-with-V3-refinement.** The candidate fails the ship
+rule and lands *below zero* — far below the +1.69 a fixed rule reaches inside the env's own
+bracket menu on identical folds/data. Attribution is therefore **optimization/extraction failure,
+NOT action-space impossibility and NOT data quantity**: the 10y window that converted the
+supervised rule from +0.03 to +4.26 moved PPO by only ~+0.21 (and inconsistently, p=0.25).
+Supporting diagnostics: eligible-eval fraction FELL 0.386→0.272 and the train−val− quadrant grew
+to 32% (vs anchor ~16%) — at fixed 3M steps over 2× data, PPO fit the train leg *less* often and
+converted none of the regularization into transfer; churn persisted (flip 32.5%, ~280
+trades/fold). **Per the pin: next A/B = exit/action-space LEARNABILITY design (e.g. explicit
+close-timer/exit head so the 24-bar close discipline is a parameter, not a discovered behavior)
+— NOT more data, NOT pooling.**
+
+**5-seed extension math (flag, decision is reviewer's):** at the finalist stage the comparator
+hardens to −0.7800 (5-seed), so shipping would need the 5-seed candidate median ≥ −0.57 (both new
+seeds landing above −0.57) AND leg b to move from p=0.25 to p<0.01 — implausible; extension looks
+unjustified under the ratified rule.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| A/B #4 sliding_train_years 5→10 (folds 11–25) | 42,43,44 | +0.2099 (vs −0.8177 sub-anchor) | p=0.248 | **NO SHIP (preview); STOP FOR REVIEW** | below V3 bracket ceiling +1.69 and V1 +4.26; E4 −0.66→−0.09; reading #3: exit/action-space learnability next; 5-seed extension implausible under rule |
