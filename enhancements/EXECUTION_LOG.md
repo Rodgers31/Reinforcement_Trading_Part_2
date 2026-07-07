@@ -1414,3 +1414,64 @@ complexity over a 26-line deterministic ridge rule.
 | change | seeds | Δmedian | Wilcoxon | decision | notes |
 |---|---|---|---|---|---|
 | (research probe — no training run) | n/a (deterministic) | — | — | **BENCHMARK SET; STOP FOR REVIEW** | V1·10y +4.26/+126% clears ruler where PPO scored −0.78 (E4 +5.43); V2 bracket-execution destroys same signal; all gates FAIL (V1·10y: PF-floor only); A/B #4 NOT launched |
+
+---
+
+## Task 24 — A/B #4 (10y train window) GO + V3 modal-bracket diagnostic — PINNED (pre-launch, 2026-07-05)
+
+**Reviewer GO (2026-07-05), conditions verbatim:** 10y sliding train window, folds 11–25, 3-seed
+rank → **5-seed finalist only on reviewer sign-off**, ratified ship rule UNCHANGED, E4 subset
+reported. One diagnostic arm added to the Task-23 simulator (V3, below) — a diagnostic, NOT a
+candidate; no search; result reported either way. Then STOP for review with the A/B #4 3-seed
+preview and the diagnostic in ONE summary.
+
+### PRE-COMMITTED READINGS (recorded BEFORE any result exists; judgment keys on these)
+1. **Ships near the +4.26 supervised benchmark → RL justified.**
+2. **Ships far below +4.26 → RL complexity unjustified vs the 26-line ridge rule; the
+   action-space question is next.**
+3. **Fails the ship rule → the post-mortem is the Task-23 V1-vs-V2 execution gap, and the next
+   A/B is exit/action-space design — NOT more data and NOT pooling.**
+(The +4.26 benchmark is a judgment key, not a new ship-rule leg — the ratified rule is unchanged.)
+
+### A/B #4 launch pin
+- **Mechanism:** `SLIDING_TRAIN_YEARS=10` launch-time env-var override (new hook in `config.py`,
+  mirroring TURNOVER_PENALTY_R/COST_RAND_FRAC; committed default stays 5.0 → anchor reproduced
+  when unset). `run_baseline` non-anchor fail-fast guard extended (any
+  `sliding_train_years != 5.0` without `--candidate` refuses to launch); knob stamped into the
+  run registry.
+- **Fold-grid equivalence (the reason no fold code changes):** with train_years=10 the sliding
+  grid yields **15 folds whose val/test windows are BY CONSTRUCTION identical to the standard
+  grid's folds 11–25** (fold j: t0_j + 120m = t0_{j+10} + 60m, same day-of-month iterative
+  DateOffset arithmetic; train = the Task-22/23-validated widened window). Asserted pre-launch by
+  `checks/check_ab4_widening.py` against the Task-22 `fold_windows.csv`; launch aborts on any
+  mismatch. Anchor parity also asserted: env var unset → the 25 anchor folds byte-identical.
+- **Budget pin:** `total_timesteps=3M/fold UNCHANGED` (isolates the data lever at fixed
+  optimization budget — 2× data at the same compute; raising steps would confound). All other
+  training knobs untouched (n_envs 4, episode 2048, dd_penalty 0.8, eval cadence, PPO preset).
+- **Run:** seeds {42,43,44}, 45 jobs, concurrency 2, label `ab4-10y-3seed`, `--candidate`
+  (INDEX row per convention; running-best CANNOT move — ship decided by the A/B report).
+- **Comparison (bespoke `enhancements/10_ab4/ab4_report.py` — vanilla ab_report.py would mispair):**
+  ship-rule legs and constants IMPORTED from ab_report.py unchanged (Δmedian ≥ 0.21, paired
+  Wilcoxon p<0.01 positive, ≥4/5 seeds beat [n/a at 3-seed preview], no gate-leg regression);
+  pairing = candidate fold j ↔ anchor fold j+10, same seed (45 pairs at 3 seeds); anchor-side
+  comparator = the anchor run's own artifacts **re-stitched over folds 11–25 per seed** (method
+  proven in Task 23: full-25 re-stitch reproduced ratified per-seed to <5e-4):
+  **3-seed {42,43,44} median −0.8177** (preview stage), 5-seed −0.7800 (finalist stage);
+  anchor gate legs recomputed per seed on the same fold subset. **E4 = candidate folds j=9–15
+  (std f19–25) stitched, vs anchor E4 3-seed −0.6606** (5-seed −0.6606). Supervised benchmark
+  **V1·10y +4.2626 (E4 +5.4268)** recorded alongside every table (reading key #1/#2).
+- 5-seed extension (seeds 45,46 via `--resume`) ONLY on reviewer sign-off.
+
+### V3 diagnostic pin (research-only, runs alongside; one variant, zero search)
+**V3 = Task-23 V1 entries (fwd4·ridge top-quintile |score|, train-q80 threshold, direction =
+sign) executed under the MODAL bracket: SL 2.0×ATR, TP 3R (= 6×ATR from entry), H=24.** All other
+conventions byte-identical to V2's pin: brackets from entry price, H1 touch scan t+1…t+24,
+gap-through fills at open, both-touch-in-bar → SL first (ambiguity counted), timeout → close of
+t+24, `eow` at window end; sizing at the ACTUAL SL distance (units = 0.005×equity/(2.0×ATR),
+env formula); costs/commission/ruler/gate identical; arms 5y (folds 1–25) and 10y (folds 11–25)
++ the 5y folds-11–25 sub-cut; era medians + E4 reported. Implementation: `simulate()` gains
+explicit (sl_mult, tp_r) parameters with canonical defaults (V1/V2 cells unchanged — reproduced
+byte-identical before V3 runs); V3 driver in `enhancements/10_ab4/v3_modal_diagnostic.py`.
+**Purpose:** V2 showed the canonical bracket destroys the signal; V3 bounds whether ANY bracket
+in the env's menu (its widest) can monetize the 4-bar drift — pinning A/B #4's failure
+attribution (action-space geometry vs optimization) BEFORE the RL result is known.
