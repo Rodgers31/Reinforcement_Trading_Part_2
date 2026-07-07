@@ -1,7 +1,8 @@
-# 11 — Supervised Hardening Proposal (Track 2 — DESIGN ONLY, nothing executed)
+# 11 — Supervised Hardening Proposal
 
-**Date:** 2026-07-07 · **Branch:** `execution/phase-a` · **Status: PROPOSAL. No cell in this
-document has been run.** Written while A/B #5 trains (Task 25), for joint review with its result.
+**Date:** 2026-07-07 · **Branch:** `execution/phase-a` · **Status: APPROVED 2026-07-07 with
+reviewer amendments A1–A3 (incorporated below); execution pinned in EXECUTION_LOG Task 26.**
+Originally written design-only while A/B #5 trained (Task 25), reviewed jointly with its result.
 **Base system:** Task-23 **V1·10y** — fwd4·ridge top-quintile |score| (train-q80 threshold),
 sign direction, 4-bar time exit, 10y train window, folds 11–25: metric **+4.2626**, +126.2%,
 PF 1.113, trade-Sharpe +0.81, E4 +5.43/+80.3% — **gate FAIL on exactly one leg** (10th-pct fold
@@ -46,18 +47,30 @@ return, MTM maxDD, PF, trade-Sharpe, all three gate legs), per-era fold-metric m
 **E4 subset** (ratified rule), exit-reason mix, ambiguity counts, and per-fold table for
 f15/f16/f18/f24 specifically.
 
-## 3. Success criterion + stop rule (pre-committed)
+## 3. Success criterion + stop rule (pre-committed; amendments A1 + A3 ratified 2026-07-07)
 
 A cell "passes" only if it **passes the FULL ratified gate on folds 11–25** (all three legs) AND
-keeps the E4-subset return positive. Ranking among passers (if several): highest 10th-pct fold
-PF, not highest metric (the metric's denominator shrinks mechanically when a stop cuts MTM DD —
-optimizing it would be self-flattering; it is reported, never targeted).
+keeps the E4-subset return positive AND **(A1, economic-viability floor) keeps stitched return ≥
++63.1% — half the unhardened base's +126.2%**. A1 is deliberately a RETURN floor, not a metric
+floor: a stop mechanically shrinks the metric's MTM-DD denominator, so a metric target would be
+self-flattering; a hardening that buys its gate pass by giving up more than half the economics
+has failed economically. Ranking among passers (if several): highest 10th-pct fold PF, not
+highest metric (same anti-self-flattery reasoning; the metric is reported, never targeted).
 **If none of H1/H2/H3 passes, the hardening line STOPS** — no H4, no constant adjustment, no
 threshold revisit. The honest conclusion would then be: the supervised edge is real but not
 deployable under the ratified gate, and the E3 diagnosis (§4) decides whether a *new*, separately
 pinned proposal is even warranted.
 
+**(A3) A passing cell does NOT proceed toward deployment directly.** It triggers a separately
+pinned **enh/12 pre-deployment validation proposal** — a report-only robustness battery:
+selection-threshold perturbation (q75/q85 around the frozen q80), ridge-alpha perturbation, and
+a cost +25% stress. **The lockbox stays sealed until enh/12 exists and passes review.**
+
 ## 4. E3 failure-diagnosis plan (analysis-only; no parameter may change because of it)
+
+**(A2, ratified 2026-07-07): this diagnosis runs FIRST — before any H-cell — so the cell results
+are read as mechanism-confirmed or mechanism-suspicious against it.** The no-parameter-change
+rule is unchanged: nothing in H1/H2/H3 may be altered in response to the diagnosis.
 
 E3 (tests 2017-07→2020-07) is the base's weak era (fold-metric median −0.12; f15 −4.8%,
 f16 −13.3%, f18 −8.7%). Pre-registered questions, all answerable from data already on disk:
@@ -102,18 +115,21 @@ trailing 10y, fit `Ridge(alpha=1.0)` on train-standardized features, recompute t
   the stop rule (§3) prevents the ledger from growing silently.
 - **E4 + per-era reporting mandatory** (ratified 2026-07-07); anchor sub-comparators −0.78
   (f11–25) / −0.66 (E4) and the V1·10y control reported in every table.
-- **Lockbox untouched:** nothing here reads a bar at/after 2024-07-01. The Phase-E reveal
-  remains one-shot, for one finally-chosen system.
+- **Lockbox scope guard:** no bar at/after 2024-07-01 is read anywhere in this proposal.
+  (Sealing/reveal governance lives in the §3 A3 clause and the future enh/12 — not here.)
 - Deterministic (no seeds); Task-23 fidelity caveats carry over (H1-touch fills bounded by
   measured ambiguity rates).
 
-## 7. Execution plan and cost (IF approved)
+## 7. Execution plan and cost (approved 2026-07-07; runs in parallel with the A/B #5 6M pool)
 
-Extends the Task-23 simulator (`enhancements/09_probe/run_supervised_baseline.py` — `simulate()`
-already parameterized for stops by Task 24; H2 adds a per-entry size multiplier argument).
-Protocol pin in EXECUTION_LOG first (per house rule), then one deterministic run: 3 cells × 15
-folds, minutes of compute, artifacts under `enhancements/11_hardening/`. Results doc =
-`enhancements/11` RESULTS section (this file gains the tables; no new doc number).
+Order per A2: **§4 E3 diagnosis first** (pure analysis over committed artifacts:
+`09_probe/trades_V1_10y.csv.gz`, `summary_V1_10y.csv`, `08_probe/results_univariate.csv`,
+`08_probe/fold_windows.csv`), **then** the three cells. Runner = new script under
+`enhancements/11_hardening/` with a pre-flight that reproduces the committed V1·10y per-fold rows
+exactly (stop disabled, scale=1) before any H-cell runs — proving the runner faithful to the
+Task-23 simulator. Protocol pin in EXECUTION_LOG (Task 26) precedes execution per house rule.
+One deterministic run: 3 cells × 15 folds, minutes of compute. Results = RESULTS section
+appended to this file (no new doc number).
 
 ## 8. Relationship to the RL tracks
 

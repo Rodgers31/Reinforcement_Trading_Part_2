@@ -1678,3 +1678,47 @@ pointing at entries-not-optimization, which more steps may not fix.
 | change | seeds | Δmedian | Wilcoxon | decision | notes |
 |---|---|---|---|---|---|
 | A/B #5 hold-horizon head (k∈{2,4,8,24}) @10y | 42,43,44 | **+0.2117** (leg-a PASS, first ever) | p=0.623, paired med −0.075 | **NO SHIP (preview); underfit signature HOLDS → 6M follow-up PERMITTED; STOP FOR REVIEW** | exit head adopted (horizon_close 31.8%, flip 32.5→15.5%) but money unchanged (−0.61); E4 −0.66→−0.03; terminal call deferred to reviewer |
+
+---
+
+## Task 26 — A/B #5b 6M TERMINAL-RULE TIEBREAKER + enh/11 EXECUTION (amended A1–A3) — PINNED (pre-launch, 2026-07-07)
+
+**Reviewer decisions (2026-07-07):** (1) GO on the pre-authorized 6M-steps follow-up;
+(2) enh/11 APPROVED with amendments A1 (economic-viability floor ≥ +63.1% stitched return),
+A2 (E3 diagnosis runs FIRST), A3 (passing cell → separately pinned enh/12 report-only robustness
+battery [q75/q85 threshold perturbation, ridge-alpha perturbation, cost +25% stress]; lockbox
+sealed until enh/12 exists and passes review). Amendments incorporated into
+`enhancements/11-supervised-hardening-proposal.md` before this pin. Both tracks run in parallel
+(no shared state: the 6M pool is RL training in `runs/`; the hardening cells are deterministic
+sklearn/pandas over committed artifacts). STOP when both land; joint summary.
+
+### Track 1 pin — A/B #5b (6M steps)
+- **Identical to Task 25 in every respect except `--steps 6000000`:** HOLD_HORIZON_BARS=2,4,8,24,
+  SLIDING_TRAIN_YEARS=10, folds 11–25, seeds {42,43,44}, concurrency 2, `--candidate`, label
+  `ab5b-holdhorizon-10y-6M-3seed`. Eval COUNT unchanged (eval_freq = steps//20 → 20 evals/job),
+  so eligibility/late-peak numbers are directly comparable to 3M. Comparators and ship rule
+  unchanged (anchor sub −0.8177 3-seed / −0.7800 5-seed / E4 −0.6606; ab4_report.py verbatim).
+- **(i) TERMINAL-RULE TIEBREAKER:** if this run fails the ship rule, the TERMINAL RULE fires
+  AUTOMATICALLY — the end-to-end RL line is CLOSED as an architecture negative. No new
+  signature, no appeal, no further steps-scaling.
+- **(ii) Mandatory result diagnostics:** eligible-eval fraction, train/val sign quadrants,
+  late-peaking % (same operational definition as Task 25), horizon_close share + chosen-k mix —
+  the underfit hypothesis gets its definitive answer either way.
+- **(iii) Pre-recorded interpretation:** if the eligible fraction recovers materially at 6M and
+  the money still does not move, the post-mortem conclusion is **"fit restored, transfer still
+  absent — entry selectivity unlearnable from this reward signal."**
+
+### Track 2 pin — enh/11 execution (order per A2)
+1. **E3 diagnosis first** (analysis-only; no-parameter-change rule in force): Q1 loss
+   concentration (worst-10-trades share, f15/f16/f18), Q2 long/short capture asymmetry,
+   Q3 univariate era-IC persistence (from Task-22 CSV), Q4 vol-regime percentile of bad folds
+   (trade-log proxy: per-fold mean entry_atr/entry_price — pinned as proxy). Inputs are all
+   committed artifacts; output `enhancements/11_hardening/e3_diagnosis.json` + doc section.
+2. **Then the three cells** (constants frozen in enh/11 §2): H1 = protective SL 2.0×ATR_entry
+   (intrabar H1-touch, gap-through at open, NO TP), time exit k=4 unchanged, sizing unchanged;
+   H2 = per-entry risk scale `max(0.25, min(1, median_train(atr_close)/atr_close[t]))`, no stop;
+   H3 = both. Runner: new script `enhancements/11_hardening/run_hardening.py`; **pre-flight must
+   reproduce the committed V1·10y per-fold rows exactly** (stop off, scale 1) before H-cells run.
+   Folds 11–25 (10y arm) only. Reporting per enh/11 §2: full ruler row + all gate legs +
+   **A1 viability floor (stitched return ≥ +63.1%)** + E4 subset + per-era medians + exit mix +
+   f15/f16/f18/f24 fold table. Success/stop/enh-12 clauses per amended §3.
