@@ -141,3 +141,45 @@ proposal still stands — a deployable supervised book and an RL book are portfo
 not rivals (doc 02's portfolio framing).
 
 *Nothing in this document has been executed. Awaiting joint review with the A/B #5 result.*
+
+---
+
+## RESULTS (executed 2026-07-07 per Task 26 pin; diagnosis first per A2)
+
+### E3 diagnosis (§4) answers — recorded BEFORE the cells ran
+- **Q1 (concentration):** worst-10-trades share of gross losses = 25–28% in the bad folds — but
+  27–30% in the clearing folds too. **Tails are uniform across folds**; bad folds differ by the
+  winner side drying up, not by fatter tails. (Pre-registered H1 flag technically fired
+  "confirmed" at ≥25%; the context contrast flagged the risk that a stop cuts winners equally.)
+- **Q2 (direction):** shorts bleed in 4 of 6 E3 folds (f15 −578, f16 −764, f17 −747, f18 −288
+  net); longs positive in 4 of 6. E3 weakness is short-side-tilted, not uniform.
+- **Q3 (signal):** 3/6 top features keep ≥half their E1/E2 IC in E3 (dow_cos, lower_wick_ratio,
+  close_ema200); tod_cos/session/vol-ratio die. Weakened, not dead.
+- **Q4 (vol regime):** the floor's binding folds are **LOW-vol**: f15 13th pct, f16 27th pct
+  (f18 100th, f24 60th). → H2 pre-declared **mechanism-suspicious** for the floor.
+
+### Cells (folds 11–25, 10y; BASE pre-flight reproduced committed V1·10y exactly)
+
+| cell | metric | return (A1 floor +63.1%) | maxDD | PF | PF-floor leg (≥0.90) | E4 ret | f15 / f16 / f18 / f24 PF | FULL |
+|---|---|---|---|---|---|---|---|---|
+| BASE | +4.263 | +126.2% PASS | −29.6% | 1.113 | **0.82 FAIL** | +80.3% | .912/.811/.840/.798 | FAIL |
+| H1 stop | +3.440 | +89.6% PASS | −26.0% | 1.089 | **0.82 FAIL** | +57.2% | .933/.822/**.812**/**.722** | FAIL |
+| H2 sizing | +4.166 | +122.0% PASS | −29.3% | 1.119 | **0.84 FAIL** | +69.6% | .915/.809/**.899**/.805 | FAIL |
+| H3 both | +3.963 | +92.8% PASS | −23.4% | 1.098 | **0.83 FAIL** | +51.6% | .936/.823/.852/.723 | FAIL |
+
+Breadth (11/15) and trade-Sharpe pass everywhere; every cell clears the A1 viability floor;
+**every cell fails the same PF-floor leg.**
+
+### Conclusion — the pre-committed stop rule fires: the hardening line STOPS
+The diagnosis explained the outcome in advance. The floor is driven by **low-vol E3 chop folds
+(f15/f16) where the signal weakens and shorts bleed** — a regime problem, not a tail or leverage
+problem: H1's stop cut winners as much as tails (uniform Q1 shares; f24 worsened, E4 −23pp);
+H2 engaged only where vol was high, fixing f18 (0.840→0.899) and nothing else. Per §3: **no H4,
+no constant adjustment, no threshold revisit; the enh/12 trigger (A3) is NOT reached.**
+V1·10y stands as a benchmark — real edge (+126%, E4 +80%), not deployable under the ratified
+gate. Any further supervised step (the diagnosis points at short-side/regime handling in E3, or
+the Q3-motivated 15y-window question) is a NEW lever requiring its own pre-registered proposal
+with fresh multiplicity accounting — explicitly out of this proposal's scope.
+
+Artifacts: `enhancements/11_hardening/` (e3_diagnosis.{py,json}, run_hardening.py,
+hardening_report.json, per-cell summary/stitched/trades CSVs).

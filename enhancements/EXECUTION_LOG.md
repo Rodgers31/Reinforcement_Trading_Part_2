@@ -1722,3 +1722,16 @@ sklearn/pandas over committed artifacts). STOP when both land; joint summary.
    Folds 11–25 (10y arm) only. Reporting per enh/11 §2: full ruler row + all gate legs +
    **A1 viability floor (stitched return ≥ +63.1%)** + E4 subset + per-era medians + exit mix +
    f15/f16/f18/f24 fold table. Success/stop/enh-12 clauses per amended §3.
+
+### Task 26 — Track 2 RESULTS: E3 diagnosis + H1/H2/H3 — ALL CELLS FAIL THE PF FLOOR; hardening line STOPPED per pre-commit  ✅ (2026-07-07)
+
+Diagnosis first (A2): tails UNIFORM across folds (25–30% worst-10 share in winners too);
+E3 weakness = short-side bleed in low-vol chop (f15 13th / f16 27th vol pct); 3/6 features alive.
+Pre-declared reading: H1 nominally confirmed (with uniform-tails caveat), H2 mechanism-suspicious.
+Cells (BASE pre-flight reproduced committed V1·10y exactly): H1 +89.6% floor 0.82 (f24 WORSE
+0.798→0.722; stop cuts winners too — caveat vindicated); H2 +122.0% floor 0.84 (fixed exactly the
+one high-vol bad fold f18 0.840→0.899 — suspicion vindicated); H3 +92.8% floor 0.83. All pass the
+A1 viability floor (+63.1%); **all fail the PF-floor leg → per §3 the hardening line STOPS; no
+enh/12 trigger.** V1·10y = benchmark, not deployable. Next supervised step (if any) = NEW pinned
+proposal (E3 short-side/regime handling, or 15y window) — reviewer's call.
+Full tables: enh/11 RESULTS section; artifacts `enhancements/11_hardening/`.
