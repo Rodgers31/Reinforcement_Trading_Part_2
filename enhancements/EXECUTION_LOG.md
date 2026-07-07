@@ -1629,3 +1629,52 @@ Any other failure shape → reading (iv) TERMINAL RULE fires with no follow-up.
 
 **Additional pinned diagnostics to report:** chosen-k distribution (trade-log `hold_bars`),
 `horizon_close` share of exits, flip%, eligibility, exit-reason mix vs A/B #4.
+
+### Task 25 RESULTS — A/B #5 3-seed preview: NO SHIP (leg b), but FIRST-EVER leg-a pass + pinned underfit signature HOLDS → 6M follow-up PERMITTED; terminal call is reviewer's  ✅ (2026-07-07)
+
+Run `20260707-135547_1142ac3_ab5-holdhorizon-10y-3seed`: 45/45 jobs, ~10.2h compute, candidate
+INDEX row, running-best UNCHANGED. Ship-rule evaluation (Task-24 ab4_report.py verbatim):
+`runs/…/ab4_report.json`.
+
+| seed | metric (f11–25) | ret | PF | folds+ |
+|---|---|---|---|---|
+| 42 | −0.6565 | −35.3% | 0.952 | 6/15 |
+| 43 | −0.5544 | −27.5% | 0.971 | 4/15 |
+| 44 | −0.6060 | −36.3% | 0.956 | 3/15 |
+
+**Legs:** (a) Δmedian **+0.2117 ≥ 0.21 → PASS — the first leg-a pass of Phase C**;
+(b) paired Wilcoxon p=0.623 with **median paired Δ −0.075 (negative!)** → FAIL — the stitched
+improvement is concentrated in a few folds while the typical fold is slightly worse;
+(c) 3/3 seeds beat −0.8177 (informational); (d) no gate regression. **SHIP_preview = False.**
+**E4:** candidate median **−0.0294** vs anchor −0.6606 (s43 **+0.7435** — a positive E4 seed).
+**Ladder:** anchor −0.8177 → #4 −0.6078 → **#5 −0.6060** → V3 +1.69 → V1 +4.26. Headline
+unchanged vs #4; seed spread tightened (0.10 vs 0.40).
+
+**Pinned readings applied:** (i) ships vs anchor — NO. (ii) ≥ V3 +1.69 — NO. (iii) ~+4.26 — NO.
+(iv) TERMINAL RULE — **suspended by the pre-defined exception**: the positive-but-underfit
+signature HOLDS on all three hard legs: Δmedian +0.2117 > 0 ✓; eligible_eval_fraction
+**0.1533** ≤ 0.32 ✓ (anchor 0.386 → #4 0.272 → #5 0.153 — eligibility halves each time capacity/
+data grow at fixed 3M steps); train−val− share **41.6%** ≥ 25% ✓ (anchor ~16%, #4 32%).
+Late-peaking diagnostic (non-gating): **8/45 = 18%** — lukewarm; most best-checkpoints are NOT
+late, which tempers the pure more-steps story.
+
+**Mechanism diagnostics (pinned): the exit head WORKS mechanically —**
+`horizon_close` = **31.8%** of 15,547 OOS exits (the #1 exit reason); chosen-k spread over the
+whole menu (24: 33.5%, 8: 31.3%, 4: 20.9%, 2: 14.3%); median hold 4 bars = the supervised sweet
+spot; **flip churn HALVED** (32.5% → 15.5%); TP exits 7.9%. The agent adopted V1/V3-shaped exit
+behavior — **and the money did not follow** (−0.61 ≈ #4's −0.61). The exit game is being played;
+the ENTRY signal PPO learns still is not the ridge signal. Consistent with Task-22/23: the edge
+is entry-side selectivity; exits were the monetization multiplier, not the source.
+
+**Recommendation (decision is reviewer's):** spend the pre-authorized **6M-steps follow-up**
+(everything else identical, 3-seed) as the terminal-rule tiebreaker — closing the end-to-end
+line on a run whose training-side underfit markers are this loud (eligible 0.153) would leave
+the architecture negative contestable; pre-commit that if the 6M run also fails the ship rule,
+the TERMINAL RULE fires with no further appeal. Honest counter-evidence for firing it NOW
+instead: late-peak only 18%, leg-b paired median negative, and #4→#5 headline unchanged — all
+pointing at entries-not-optimization, which more steps may not fix.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| A/B #5 hold-horizon head (k∈{2,4,8,24}) @10y | 42,43,44 | **+0.2117** (leg-a PASS, first ever) | p=0.623, paired med −0.075 | **NO SHIP (preview); underfit signature HOLDS → 6M follow-up PERMITTED; STOP FOR REVIEW** | exit head adopted (horizon_close 31.8%, flip 32.5→15.5%) but money unchanged (−0.61); E4 −0.66→−0.03; terminal call deferred to reviewer |
