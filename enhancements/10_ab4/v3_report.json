@@ -1,0 +1,140 @@
+{
+  "pinned": {
+    "sl_mult": 2.0,
+    "tp_r": 3.0,
+    "H": 24,
+    "entries": "Task-23 V1 (fwd4-ridge top-quintile)"
+  },
+  "V3_5y": {
+    "metric_stitched": 0.04448413788427693,
+    "stitched_return_pct": 1.7636395445490116,
+    "stitched_max_dd_mtm_pct": -39.64648138482585,
+    "stitched_pf": 1.0105665658944314,
+    "stitched_sharpe_trade": 0.06760111486435232,
+    "n_trades": 2987.0,
+    "win_rate_pct": 38.83495145631068,
+    "avg_bars_in_trade": 15.748577167726816,
+    "gate_passed": false,
+    "gate_detail": [
+      "[FAIL] folds with return>0 & PF>1: 13/25  (need >= 18 = ceil(70% of 25))",
+      "[FAIL] 10%-quantile fold PF: 0.76  (need >= 0.9)",
+      "[OK  ] mean trade-Sharpe: +0.03  (need > 0)"
+    ],
+    "folds_positive": 13,
+    "n_folds": 25,
+    "era_fold_metric_median": {
+      "1": -0.33758660480910063,
+      "2": -0.6075241722015692,
+      "3": 0.02939962723830982,
+      "4": 0.612226707451745
+    },
+    "era_return_median": {
+      "1": -4.519940563374103,
+      "2": -5.619777582720836,
+      "3": 0.22650366005395606,
+      "4": 4.09789220521275
+    },
+    "E4_metric_stitched": 1.3624750745337848,
+    "E4_return_pct": 24.7227449991168,
+    "exit_reason_mix": {
+      "SL": 1545,
+      "timeout": 1142,
+      "TP": 269,
+      "eow": 20,
+      "SL_gap": 8,
+      "TP_gap": 3
+    },
+    "gross_pnl_mid_total": 6005.848363108642,
+    "cost_paid_total": 5125.379225076165,
+    "cost_over_gross_pct": 85.33980405764451,
+    "diag": {
+      "ambiguous_both_touch_total": 1,
+      "skipped_in_pos_total": 11066
+    }
+  },
+  "V3_10y": {
+    "metric_stitched": 1.6896229993159442,
+    "stitched_return_pct": 32.60011777948926,
+    "stitched_max_dd_mtm_pct": -19.29431464456133,
+    "stitched_pf": 1.0668418470895074,
+    "stitched_sharpe_trade": 0.43722478411728466,
+    "n_trades": 1764.0,
+    "win_rate_pct": 41.383219954648524,
+    "avg_bars_in_trade": 16.241496598639454,
+    "gate_passed": false,
+    "gate_detail": [
+      "[FAIL] folds with return>0 & PF>1: 8/15  (need >= 11 = ceil(70% of 15))",
+      "[FAIL] 10%-quantile fold PF: 0.85  (need >= 0.9)",
+      "[OK  ] mean trade-Sharpe: +0.37  (need > 0)"
+    ],
+    "folds_positive": 8,
+    "n_folds": 15,
+    "era_fold_metric_median": {
+      "2": -0.15667571851335882,
+      "3": -0.23821839362701516,
+      "4": 1.1278282406955766
+    },
+    "era_return_median": {
+      "2": -1.2423058291086697,
+      "3": -2.873923937666601,
+      "4": 4.563939293777408
+    },
+    "E4_metric_stitched": 3.3608937068485654,
+    "E4_return_pct": 46.81047506357595,
+    "exit_reason_mix": {
+      "SL": 890,
+      "timeout": 705,
+      "TP": 154,
+      "eow": 10,
+      "SL_gap": 5
+    },
+    "gross_pnl_mid_total": 6241.75632167728,
+    "cost_paid_total": 3035.7192661173726,
+    "cost_over_gross_pct": 48.63565813318417,
+    "diag": {
+      "ambiguous_both_touch_total": 1,
+      "skipped_in_pos_total": 6116
+    }
+  },
+  "V3_5y_f11_25": {
+    "metric_stitched": 0.6790738839790396,
+    "stitched_return_pct": 13.495075623525189,
+    "stitched_max_dd_mtm_pct": -19.872764866836977,
+    "stitched_pf": 1.033621774410163,
+    "stitched_sharpe_trade": 0.22666527130421463,
+    "n_trades": 1741.0,
+    "win_rate_pct": 39.63239517518667,
+    "avg_bars_in_trade": 16.176335439402642,
+    "gate_passed": false,
+    "gate_detail": [
+      "[FAIL] folds with return>0 & PF>1: 9/15  (need >= 11 = ceil(70% of 15))",
+      "[FAIL] 10%-quantile fold PF: 0.79  (need >= 0.9)",
+      "[OK  ] mean trade-Sharpe: +0.19  (need > 0)"
+    ],
+    "folds_positive": 9,
+    "n_folds": 15,
+    "era_fold_metric_median": {
+      "2": -0.6075241722015692,
+      "3": 0.02939962723830982,
+      "4": 0.612226707451745
+    },
+    "era_return_median": {
+      "2": -6.275995451998079,
+      "3": 0.22650366005395606,
+      "4": 4.09789220521275
+    },
+    "E4_metric_stitched": 1.3624750745337848,
+    "E4_return_pct": 24.7227449991168,
+    "exit_reason_mix": {
+      "SL": 879,
+      "timeout": 690,
+      "TP": 152,
+      "eow": 12,
+      "SL_gap": 6,
+      "TP_gap": 2
+    },
+    "gross_pnl_mid_total": 4577.2488794644,
+    "cost_paid_total": 2980.2438575020833,
+    "cost_over_gross_pct": 65.10993690714088
+  }
+}

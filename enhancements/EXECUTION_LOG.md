@@ -1475,3 +1475,33 @@ byte-identical before V3 runs); V3 driver in `enhancements/10_ab4/v3_modal_diagn
 **Purpose:** V2 showed the canonical bracket destroys the signal; V3 bounds whether ANY bracket
 in the env's menu (its widest) can monetize the 4-bar drift — pinning A/B #4's failure
 attribution (action-space geometry vs optimization) BEFORE the RL result is known.
+
+### Task 24 — V3 diagnostic RESULT (recorded while A/B #4 trains; run `20260707-012025_4fa6046_ab4-10y-3seed` in flight)  ✅ (2026-07-06)
+
+Pre-flight PASS (parameterized `simulate()` reproduced the committed Task-23 V1/V2 fold-11 rows
+to <1e-9). One variant, zero search, 10s runtime. Artifacts `enhancements/10_ab4/v3_report.json`.
+
+| cell | folds | metric | return | PF | gate | E4 metric / return | exit mix |
+|---|---|---|---|---|---|---|---|
+| V3·5y | 1–25 | +0.0445 | +1.8% | 1.011 | FAIL | +1.36 / +24.7% | SL 52% / timeout 38% / TP 9% |
+| **V3·10y** | 11–25 | **+1.6896** | **+32.6%** | 1.067 | FAIL | **+3.36 / +46.8%** | SL 50% / timeout 40% / TP 9% |
+| V3·5y | 11–25 | +0.6791 | +13.5% | 1.034 | FAIL | +1.36 / +24.7% | — |
+
+**Reading (pinned purpose: bound what the env's bracket menu can express):** the modal bracket
+does NOT destroy the drift signal the way the canonical one did — it monetizes **≈27% of the
+time-exit result** (+1.69 vs V1·10y's +4.26 on the same folds; E4 +3.36 vs +5.43). Mechanism
+visible in the exit mix: 40% of positions reach the 24-bar timeout (de-facto time exits), the
+2.0×ATR stop truncates the rest; the 6×ATR TP almost never fires (9%). **The action space is not
+a brick wall — a fixed rule expressible in the env's own menu (widest bracket + 24-bar close
+discipline) reaches +1.69 on A/B #4's exact folds.** This refines the pre-committed failure
+attribution BEFORE the RL result is known — the decision ladder on folds 11–25 is now:
+
+> anchor RL −0.8177 (3-seed) · **bracket-expressible supervised ceiling V3 +1.69** ·
+> time-exit supervised ceiling V1 +4.26
+
+- A/B #4 lands ≈ 0 or below → optimization/extraction failure, NOT action-space impossibility
+  (V3 proves +1.69 is expressible with brackets); reading #3's "exit/action-space design next"
+  should then target *learnability* (e.g. explicit close-timer/exit head), not menu width alone.
+- A/B #4 lands ≈ V3 (+1.7-ish) → bracket geometry is the binding loss vs +4.26 → action-space
+  question (reading #2) with V3 as the measured bracket ceiling.
+- A/B #4 near +4.26 → reading #1 (RL justified) — it would have beaten every fixed rule.

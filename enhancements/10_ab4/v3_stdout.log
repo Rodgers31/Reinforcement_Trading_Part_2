@@ -1,0 +1,32 @@
+Loading data (anchor-identical path)…
+[OK] pre-flight: parameterized simulate() reproduces committed V1/V2 fold-11 rows
+fold  1/25 (9s)
+fold  2/25 (9s)
+fold  3/25 (9s)
+fold  4/25 (9s)
+fold  5/25 (9s)
+fold  6/25 (9s)
+fold  7/25 (9s)
+fold  8/25 (9s)
+fold  9/25 (9s)
+fold 10/25 (9s)
+fold 11/25 (9s)
+fold 12/25 (9s)
+fold 13/25 (9s)
+fold 14/25 (9s)
+fold 15/25 (9s)
+fold 16/25 (9s)
+fold 17/25 (9s)
+fold 18/25 (9s)
+fold 19/25 (9s)
+fold 20/25 (9s)
+fold 21/25 (9s)
+fold 22/25 (9s)
+fold 23/25 (9s)
+fold 24/25 (9s)
+fold 25/25 (9s)
+        V3_5y: metric +0.0445 ret +1.8% PF 1.011 gate FAIL E4m +1.3625 E4ret +24.7% exits {'SL': 1545, 'timeout': 1142, 'TP': 269, 'eow': 20, 'SL_gap': 8, 'TP_gap': 3}
+       V3_10y: metric +1.6896 ret +32.6% PF 1.067 gate FAIL E4m +3.3609 E4ret +46.8% exits {'SL': 890, 'timeout': 705, 'TP': 154, 'eow': 10, 'SL_gap': 5}
+ V3_5y_f11_25: metric +0.6791 ret +13.5% PF 1.034 gate FAIL E4m +1.3625 E4ret +24.7% exits {'SL': 879, 'timeout': 690, 'TP': 152, 'eow': 12, 'SL_gap': 6, 'TP_gap': 2}
+
+runtime 10s; v3_report.json written
