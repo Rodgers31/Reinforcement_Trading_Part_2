@@ -204,6 +204,13 @@ class ProjectConfig:
     # anchor. TRAIN-ONLY: eval/val/test rollouts and the equity-based metric always
     # use the pinned cost — the honest ruler is NEVER randomized.
     cost_rand_frac: float = 0.0
+    # Hold-horizon commitment (Phase-C A/B #5): non-empty menu adds a 4th action
+    # head — the agent picks k (decision bars) at entry and the env auto-flattens
+    # at k bars ("horizon_close"); brackets keep intrabar priority. () = off =
+    # anchor (action space and observation byte-identical). Candidate runs set
+    # it via the HOLD_HORIZON_BARS env var; guarded + registry-stamped like the
+    # other Phase-C knobs.
+    hold_horizon_bars: Tuple[int, ...] = ()
 
     # ── PPO regularisation (generalisation-first preset) ─────────────────────
     # The knobs that most directly control overfitting. Tune these between runs.
@@ -326,3 +333,14 @@ if _sty_override is not None:
             and 0.5 <= CFG.sliding_train_years <= 20.0):
         raise ValueError(
             f"SLIDING_TRAIN_YEARS={CFG.sliding_train_years} out of sane range [0.5, 20]")
+
+_hh_override = _os.environ.get("HOLD_HORIZON_BARS")
+if _hh_override is not None:
+    try:
+        CFG.hold_horizon_bars = tuple(
+            int(tok) for tok in _hh_override.split(",") if tok.strip())
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid HOLD_HORIZON_BARS={_hh_override!r}; expected comma-separated "
+            f"positive ints (e.g. '2,4,8,24')") from exc
+    # Range/positivity is enforced canonically in BracketTradingEnv.__init__.

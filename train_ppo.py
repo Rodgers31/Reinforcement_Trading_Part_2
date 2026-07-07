@@ -119,6 +119,7 @@ def build_env(decision_df, m1_df, feature_cols, randomize_start: bool = False,
         turnover_penalty_r=CFG.turnover_penalty_r,
         turnover_entry_frac=CFG.turnover_entry_frac,
         cost_rand_frac=cost_rand_frac,   # TRAIN-only; eval callers use the 0.0 default
+        hold_horizon_bars=CFG.hold_horizon_bars,  # () = anchor; A/B #5 sets via env var
         randomize_start=randomize_start,
         max_episode_steps=episode_steps,
     )

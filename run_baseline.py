@@ -347,7 +347,8 @@ def main() -> None:
     _nonanchor = {k: v for k, v, anchor_v in
                   (("turnover_penalty_r", _CFG.turnover_penalty_r, 0.0),
                    ("cost_rand_frac", _CFG.cost_rand_frac, 0.0),
-                   ("sliding_train_years", _CFG.sliding_train_years, 5.0))
+                   ("sliding_train_years", _CFG.sliding_train_years, 5.0),
+                   ("hold_horizon_bars", _CFG.hold_horizon_bars, ()))
                   if v != anchor_v}
     if _nonanchor and not args.candidate:
         raise SystemExit(
@@ -373,6 +374,7 @@ def main() -> None:
         reg["turnover_entry_frac"] = _CFG.turnover_entry_frac  # 1.0 = flat (A/B #1)
         reg["cost_rand_frac"] = _CFG.cost_rand_frac           # 0.0 = anchor
         reg["sliding_train_years"] = _CFG.sliding_train_years  # 5.0 = anchor (A/B #4: 10.0)
+        reg["hold_horizon_bars"] = list(_CFG.hold_horizon_bars)  # [] = anchor (A/B #5: [2,4,8,24])
         reg_path.write_text(json.dumps(reg, indent=2))
         print(f"[pool] parent run: {run_dir}", flush=True)
 
