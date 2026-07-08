@@ -58,3 +58,35 @@ medians, and the f15/f16/f18/f24 fold table. Results appended below; artifacts i
 
 *Pinned before execution; see EXECUTION_LOG Task 27 (which also pins Tracks B and C and the
 project endgame).*
+
+---
+
+## RESULTS (executed 2026-07-08; pre-flight reproduced committed V1·10y exactly)
+
+| cell | metric | return (viab ≥+63.1%) | PF | gate legs (breadth/floor/Sharpe) | E4 ret | beats-beta | FULL |
+|---|---|---|---|---|---|---|---|
+| BASE (control) | +4.2626 | +126.2% ✓ | 1.113 | 11/15 ✓ / **0.82 ✗** / +0.75 ✓ | +80.3% | ✓ | ✗ |
+| L1 shorts-q90 | +4.0381 | +91.1% ✓ | 1.117 | **10/15 ✗** / 0.84 ✗ / +0.66 ✓ | +51.5% | ✓ | ✗ |
+| **L2 long-only** | **+6.2523** | +89.7% ✓ | **1.157** | 11/15 ✓ / **0.88 ✗** / +0.80 ✓ | +50.5% | ✓ | **✗** |
+| BETA always-long | −0.9826 | −92.8% ✗ | 0.912 | 2/15 / 0.80 / −1.17 | −79.3% | — | — |
+
+Context row: unlevered gold B&H = +53.3% over the stitched window, +4.8% over the E4 window.
+BETA (long exposure through the trade grammar) is annihilated by cost drag (10,310 trades) —
+the cells' returns are selection skill, not beta.
+
+**The diagnosed mechanism worked — and the floor still held.** L2 flipped both diagnosed
+short-bleed victims positive (f15 −4.8%→+1.2% PF 1.047; f24 −11.4%→+2.4% PF 1.086), raised the
+floor 0.82→0.88, PF to 1.157, and posted the best metric ever measured on this dev surface
+(+6.25). The remaining floor drivers are f16 (0.850) and f18 (0.842) — E3 chop folds where the
+diagnosis says the signal itself weakens (enh/11 Q3): not a side problem, not a tail problem,
+not a leverage problem. L1's conviction-gated shorts kept most of the bleed and lost a breadth
+fold (10/15) — strictly dominated by L2.
+
+**TERMINAL RULE FIRES (pre-committed §3): neither L1 nor L2 passes → the XAUUSD-alone supervised
+line RESTS at benchmark status.** No L3, no constant tuning, no threshold search. L2's 0.88 vs
+0.90 miss is two folds of genuinely weak-signal regime; making the floor by construction would
+require exactly the kind of post-hoc lever this document forbids. The benchmark family is now:
+V1·10y +4.26/+126.2% (primary, as pinned in Task 23) with L2 long-only +6.25/+89.7% recorded
+alongside as the best-measured cell of the closed 14-cell ledger.
+
+Artifacts: `enhancements/12_levers/` (run_levers.py, levers_report.json, per-cell CSVs).

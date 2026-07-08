@@ -1846,3 +1846,15 @@ L3, no tuning.** Ledger 12 → 14 cells. Pre-flight reproduces committed V1·10y
 **Execution order this task: pin (this entry + enh/12 proposal committed) → launch silver
 download (background) → Track A cells → Track C freeze + first log → Track B census/cost/probe/
 ruler when data lands → STOP with joint summary.**
+
+### Task 27 — Track A RESULTS: L1/L2 both FAIL → TERMINAL RULE FIRED; XAUUSD-alone supervised line RESTS at benchmark  ✅ (2026-07-08)
+
+Pre-flight exact; BETA control = −92.8% (grammar cost drag; gold B&H context +53.3%/+4.8% E4).
+**L1** (shorts q90): +91.1%, floor 0.84, breadth DROPPED 10/15 → FAIL (dominated by L2).
+**L2** (long-only): **metric +6.2523 (best ever), PF 1.157, +89.7%, E4 +50.5%, beats-beta ✓,
+floor 0.88 < 0.90 → FAIL on the floor alone.** The diagnosed short-bleed folds flipped positive
+(f15 +1.2/PF 1.047, f24 +2.4/1.086); the residual floor drivers are the weak-signal E3 chop folds
+f16 (.850)/f18 (.842) — confirming enh/11 Q3 (signal weakens, not a side/tail/leverage problem).
+**Per the pre-commit: no L3, no tuning — the line RESTS.** Ledger closed at 14 cells. Endgame leg
+1 of 2 is now set: Track A failed its terminal rule; the project terminus decision rides on
+Track B replication.
