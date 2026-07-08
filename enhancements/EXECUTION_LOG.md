@@ -1784,3 +1784,65 @@ rule remains the project's endgame if that line also fails.
 | change | seeds | Δmedian | Wilcoxon | decision | notes |
 |---|---|---|---|---|---|
 | A/B #5b: #5 config, steps 3M→6M (tiebreaker) | 42,43,44 | +0.3166 | p=0.123, paired med +0.104 | **NO SHIP → TERMINAL RULE FIRED; end-to-end RL CLOSED** | eligible 0.153→0.247 (half-recovered), money still negative all seeds; pre-recorded "fit restored, transfer absent" interpretation applied; hybrid-RL = future research item only |
+
+---
+
+## Task 27 — THREE TRACKS + PROJECT ENDGAME — PINNED (pre-execution, 2026-07-08)
+
+**Reviewer direction (2026-07-08) after the Task-26 terminal state (RL closed, hardening
+stopped): Track A = final XAUUSD supervised lever family; Track B = silver replication (the
+ratified pooled-probe Phase-0 gate, reframed to replication-first); Track C = forward-shadow
+clock. STOP for review when A and B both land.**
+
+### PROJECT ENDGAME (recorded verbatim)
+**If Track A fails its terminal rule AND Track B fails replication, the project concludes at the
+honest terminus — benchmark documented, lockbox never opened.** Either success routes through a
+separately pinned enh/12-style validation battery BEFORE any lockbox discussion.
+
+### Track A pin — asymmetric/long-only lever family (full proposal: `enhancements/12-asymmetric-levers-proposal.md`)
+Exactly two cells vs V1·10y: **L1** shorts need train-q90 |score| (existing Task-22 constant;
+longs stay q80); **L2** long-only (zero constants). **Mandatory BETA control** = always-long in
+the identical trade grammar (every-bar long, k=4, same sizing/cost/folds/ruler) + unlevered gold
+B&H as context row. Success = full gate + viability ≥ +63.1% + E4 > 0 + beats-beta (return AND
+metric). **TERMINAL RULE: neither passes → XAUUSD-alone supervised line RESTS at benchmark; no
+L3, no tuning.** Ledger 12 → 14 cells. Pre-flight reproduces committed V1·10y before cells run.
+
+### Track B pin — XAGUSD replication (verdict rules pinned BEFORE any silver data is seen)
+- **Acquisition:** Dukascopy `dukascopy-node` per-year M1 chunks (same vendor/pipeline as the
+  gold backbone, commit 80ed738): bid 2003→2026, ask 2023→2026 (ask only for spread census);
+  `convert_dukascopy_to_lean.py` generalized with a `--symbol` arg (no behavior change for gold).
+  Density census per the 0b methodology; the sliding-fold grid comes from silver's OWN frame via
+  the frozen `make_sliding_folds` params (expect ~25 folds if dense from 2006; eras = fold
+  quartiles by the same Task-22 rule regardless of count).
+- **Cost methodology (mirrors gold verbatim):** silver `spread_atr_frac` = median(ask−bid) /
+  median(H1 ATR14) over 2023-01→data-end; `slippage_atr_frac` = 0.0030 reused (no independent
+  silver slippage measurement exists — pinned as methodology reuse); RT bar = spread + 2×slip.
+- **(i) Frozen Task-22 probe on silver alone:** same 25 features, same labels (k∈{2,4,8};
+  canonical + modal brackets, H=24), same models/hyperparams, same shuffle controls, same
+  verdict-config list. **REPLICATION VERDICT (pre-committed): the signal family REPLICATES iff
+  a verdict config's era-median top-quintile capture clears SILVER'S OWN cost bar in ≥2 of 4
+  eras** (same harness-integrity gate: shuffle medians within IC ±0.02 / AUC 0.48–0.52 first).
+- **(ii) Frozen V1 rule through the honest ruler on silver:** fwd4·ridge q80, k=4, 5y and 10y
+  arms, 6mo-refit grid, silver cost bar, full gate + E4-analog subset (last fold quartile) —
+  REPORTED with the same table format; no pass/fail beyond the replication verdict is pinned.
+- **QUARANTINE: no XAUUSD cell, constant, or interpretation may change based on anything seen in
+  Track B.**
+
+### Track C pin — forward-shadow clock (paper only; no broker, no execution)
+- **Freeze:** ridge refit on the 10y window ending at the LAST PRE-LOCKBOX bar (train =
+  2014-07-01→2024-06-30; fwd4 labels; q80 |train-pred| threshold). Chosen deliberately over "the
+  refit you'd run today": a trailing-10y-to-present fit would TRAIN on lockbox-era bars — the
+  seal stays intact (no lockbox bar is used for fitting OR evaluation). Consequence pinned: the
+  6mo refit cadence is SUSPENDED for the shadow (any future refit would consume lockbox bars and
+  needs its own pin). Frozen artifacts (coefficients, scaler, threshold, window hash):
+  `enhancements/12_shadow/frozen_model.json`.
+- **Shadow script** (`enhancements/12_shadow/shadow_signal.py`): pulls the latest ~30 days of
+  XAUUSD M1 from Dukascopy (public data; forward bars ≥ today are virgin, NOT lockbox
+  evaluation), rebuilds the 25 features, scores the last COMPLETED H1 bar with the frozen model,
+  appends `(utc_time, close, atr, score, side, threshold_pass, model_hash)` to the append-only
+  `shadow_log.csv`. Cadence: weekly (manual or user-scheduled); first entry logged at setup.
+  Explicitly out of scope: brokers, order routing, any execution simulation.
+
+**Execution order this task: pin (this entry + enh/12 proposal committed) → launch silver
+download (background) → Track A cells → Track C freeze + first log → Track B census/cost/probe/
+ruler when data lands → STOP with joint summary.**
