@@ -16,3 +16,4 @@ Append-only. One line per full training run (see run_registry.py).
 | 2026-07-05 | 753beea | turnover-flipaware-p045 | -0.4989 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.045 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |
 | 2026-07-07 | 4fa6046 | ab4-10y-3seed | -0.6078 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.0 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |
 | 2026-07-07 | 1142ac3 | ab5-holdhorizon-10y-3seed | -0.6060 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.0 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |
+| 2026-07-07 | d7b5ed4 | ab5b-holdhorizon-10y-6M-3seed | -0.5011 | FAIL | Phase-C CANDIDATE turnover_penalty_r=0.0 (PROVISIONAL median-of-3); gates 0/3; running-best UNCHANGED (ship decided by ab_report.py) |

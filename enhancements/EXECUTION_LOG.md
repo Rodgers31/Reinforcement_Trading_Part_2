@@ -1735,3 +1735,52 @@ A1 viability floor (+63.1%); **all fail the PF-floor leg → per §3 the hardeni
 enh/12 trigger.** V1·10y = benchmark, not deployable. Next supervised step (if any) = NEW pinned
 proposal (E3 short-side/regime handling, or 15y window) — reviewer's call.
 Full tables: enh/11 RESULTS section; artifacts `enhancements/11_hardening/`.
+
+### Task 26 — Track 1 RESULTS: A/B #5b (6M) NO SHIP → **TERMINAL RULE FIRED — end-to-end RL line CLOSED as an architecture negative**  ✅ (2026-07-08)
+
+Run `20260707-233218_d7b5ed4_ab5b-holdhorizon-10y-6M-3seed`: 45/45 jobs (~20h compute), candidate
+INDEX row, running-best UNCHANGED. Ship-rule evaluation (`ab4_report.py`): `runs/…/ab4_report.json`.
+
+| seed | metric (f11–25) | ret | PF | folds+ | E4 metric |
+|---|---|---|---|---|---|
+| 42 | −0.7519 | −40.3% | 0.945 | 4/15 | −0.3851 |
+| 43 | −0.1316 | −6.1% | 1.001 | 6/15 | **+1.5575** |
+| 44 | −0.5011 | −25.1% | 0.975 | 5/15 | −0.4682 |
+
+**Legs:** (a) Δmedian **+0.3166** vs −0.8177 → PASS (comfortable now); (b) Wilcoxon **p=0.1228**,
+median paired Δ +0.1038 (positive, was −0.075 at 3M) → **FAIL**; (c) 3/3 informational; (d) no
+regression. **SHIP_preview = False → per the Task-26 pin the TERMINAL RULE FIRES AUTOMATICALLY:
+the end-to-end RL line is CLOSED as an architecture negative. No new signature, no appeal.**
+
+**Mandatory diagnostics (the underfit hypothesis's definitive answer):** eligible-eval fraction
+**0.2467** (3M: 0.1533; anchor: 0.386) — doubling steps recovered ~HALF the eligibility gap;
+train−val− 31.8% (was 41.6%); late-peaking 27% (was 18%); horizon_close 22.5% + manual_close
+33.0% (time-based exits now 55.5% of 16,657 trades — the agent increasingly manages exits
+itself), k-mix drifted longer (24: 37%, 8: 33%), flip 14.0%, TP 6.8%.
+
+**Pre-recorded interpretation APPLIES (with the measured nuance):** fit was **partially**
+restored (0.153→0.247, halfway to anchor) and the money did not follow — median −0.606→−0.5011,
+every seed's return negative, PF ≤ 1.001, consistency far from the bar. **"Fit restored,
+transfer still absent — entry selectivity unlearnable from this reward signal."** The 3M→6M
+dose-response is now measured: 2× optimization budget bought +0.10 median and flipped the paired
+delta positive, on a trajectory that is monotone but an order of magnitude too shallow — the gap
+to the BRACKET-EXPRESSIBLE supervised ceiling (V3 +1.69) is ~2.2 metric units; to V1, ~4.8.
+
+**What CLOSED means (per the Task-25/26 pins):** no further end-to-end PPO A/Bs on this
+observation/reward architecture — not more steps, not more heads, not more data windows. The
+architecture negative is now established by 5 A/Bs + a dose-response: reward/cost shaping
+exhausted (#1–#3), data quantity helps the features but not PPO (#4 vs Task-23), exit
+learnability solved WITHOUT moving money (#5: the agent plays the exit game), optimization
+budget half-restores fit without restoring transfer (#5b). **Future RL = hybrid
+(supervised-signal-in-obs) research item ONLY, requiring its own proposal.**
+
+**Phase-C surviving lines:** (1) supervised V1·10y benchmark stands (+4.26/+126%, E4 +80%) —
+hardening line STOPPED per enh/11 §3 (all cells fail the PF floor); any new supervised lever
+(E3 short-side/regime, 15y window) needs a fresh pinned proposal. (2) doc-02 pooling per enh/07
+with the ratified pooled-probe Phase-0 gate — blocked on XAGUSD acquisition; the enh/07 stopping
+rule remains the project's endgame if that line also fails.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| A/B #5b: #5 config, steps 3M→6M (tiebreaker) | 42,43,44 | +0.3166 | p=0.123, paired med +0.104 | **NO SHIP → TERMINAL RULE FIRED; end-to-end RL CLOSED** | eligible 0.153→0.247 (half-recovered), money still negative all seeds; pre-recorded "fit restored, transfer absent" interpretation applied; hybrid-RL = future research item only |
