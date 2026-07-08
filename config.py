@@ -188,6 +188,29 @@ class ProjectConfig:
     # Reward shaping.
     holding_penalty: float = 0.00002
     reward_mtm_weight: float = 0.01
+    # Turnover penalty (Phase-C A/B #1): R-units subtracted from REWARD ONLY on
+    # each NEW position opened (fresh entry or the open leg of a flip). 0.0 = off
+    # = the ratified anchor. Reward-only — it shapes the policy gradient + the
+    # consistency-callback checkpoint selection; it NEVER touches equity, PnL,
+    # fills, cost, the trade log, or the equity-based metric (honest ruler).
+    turnover_penalty_r: float = 0.0
+    # Flip-aware turnover (Phase-C A/B #3): fraction of turnover_penalty_r charged to a
+    # FRESH entry; a FLIP/reversal always pays the full penalty. 1.0 = A/B #1 flat; 0.0 =
+    # tax flips only (spare fresh entries). Reward-only, like turnover_penalty_r.
+    turnover_entry_frac: float = 1.0
+    # Cost-domain randomization (Phase-C A/B #2): per-episode, the TRAINING env
+    # scales its execution cost by m ~ U[1-cost_rand_frac, 1+cost_rand_frac] (mean
+    # held at the measured cost) so the policy learns cost-robustness. 0.0 = off =
+    # anchor. TRAIN-ONLY: eval/val/test rollouts and the equity-based metric always
+    # use the pinned cost — the honest ruler is NEVER randomized.
+    cost_rand_frac: float = 0.0
+    # Hold-horizon commitment (Phase-C A/B #5): non-empty menu adds a 4th action
+    # head — the agent picks k (decision bars) at entry and the env auto-flattens
+    # at k bars ("horizon_close"); brackets keep intrabar priority. () = off =
+    # anchor (action space and observation byte-identical). Candidate runs set
+    # it via the HOLD_HORIZON_BARS env var; guarded + registry-stamped like the
+    # other Phase-C knobs.
+    hold_horizon_bars: Tuple[int, ...] = ()
 
     # ── PPO regularisation (generalisation-first preset) ─────────────────────
     # The knobs that most directly control overfitting. Tune these between runs.
@@ -250,3 +273,74 @@ class ProjectConfig:
 
 
 CFG = ProjectConfig()
+
+# ── Phase-C A/B knob override (launch-time, no code edit) ────────────────────
+# A CANDIDATE run may set turnover_penalty_r via the TURNOVER_PENALTY_R env var
+# WITHOUT changing the committed anchor default (0.0). run_baseline passes the
+# parent environment to every job subprocess, so all jobs in a run share one
+# value; it is stamped into each run_info.json and the run registry for audit.
+# Unset env var → CFG stays at the ratified anchor (0.0) → anchor reproduced.
+import os as _os
+
+_tp_override = _os.environ.get("TURNOVER_PENALTY_R")
+if _tp_override is not None:
+    try:
+        CFG.turnover_penalty_r = float(_tp_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid TURNOVER_PENALTY_R={_tp_override!r}; expected a float in "
+            f"R-units (e.g. 0.045)") from exc
+    # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.
+
+_cr_override = _os.environ.get("COST_RAND_FRAC")
+if _cr_override is not None:
+    try:
+        CFG.cost_rand_frac = float(_cr_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid COST_RAND_FRAC={_cr_override!r}; expected a float in [0,1) "
+            f"(e.g. 0.4 = U[0.6,1.4])") from exc
+    # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.
+
+_tef_override = _os.environ.get("TURNOVER_ENTRY_FRAC")
+if _tef_override is not None:
+    try:
+        CFG.turnover_entry_frac = float(_tef_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid TURNOVER_ENTRY_FRAC={_tef_override!r}; expected a float fraction "
+            f"(e.g. 0.0 = tax flips only)") from exc
+    # Range/finiteness is enforced canonically in BracketTradingEnv.__init__.
+
+# Sliding train-window width (Phase-C A/B #4): a CANDIDATE run may widen the
+# per-fold train window via SLIDING_TRAIN_YEARS without changing the committed
+# anchor default (5.0). With 10.0 the sliding grid yields 15 folds whose
+# val/test windows are BY CONSTRUCTION identical to the 5y grid's folds 11-25
+# (t0_j + 120m == t0_{j+10} + 60m) — only the train window widens; the honest
+# ruler (test windows, cost, metric, gate) is untouched. Guarded in
+# run_baseline (non-anchor value requires --candidate) and stamped into the
+# run registry for audit. Unset env var -> anchor grid reproduced.
+_sty_override = _os.environ.get("SLIDING_TRAIN_YEARS")
+if _sty_override is not None:
+    try:
+        CFG.sliding_train_years = float(_sty_override)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid SLIDING_TRAIN_YEARS={_sty_override!r}; expected years as a "
+            f"float (e.g. 10.0)") from exc
+    # This knob shapes fold construction (no env-side validation path): enforce here.
+    if not (CFG.sliding_train_years == CFG.sliding_train_years
+            and 0.5 <= CFG.sliding_train_years <= 20.0):
+        raise ValueError(
+            f"SLIDING_TRAIN_YEARS={CFG.sliding_train_years} out of sane range [0.5, 20]")
+
+_hh_override = _os.environ.get("HOLD_HORIZON_BARS")
+if _hh_override is not None:
+    try:
+        CFG.hold_horizon_bars = tuple(
+            int(tok) for tok in _hh_override.split(",") if tok.strip())
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid HOLD_HORIZON_BARS={_hh_override!r}; expected comma-separated "
+            f"positive ints (e.g. '2,4,8,24')") from exc
+    # Range/positivity is enforced canonically in BracketTradingEnv.__init__.

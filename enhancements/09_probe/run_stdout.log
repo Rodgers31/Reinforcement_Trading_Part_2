@@ -1,0 +1,50 @@
+Loading data (anchor-identical path)…
+25/25 fold boundaries revalidated.
+Anchor re-stitch cross-check PASS. full25 median -0.5260 | f11-25 -0.7800 | f19-25 -0.6606
+fold  1/25 simulated (8s)
+fold  2/25 simulated (8s)
+fold  3/25 simulated (8s)
+fold  4/25 simulated (8s)
+fold  5/25 simulated (8s)
+fold  6/25 simulated (8s)
+fold  7/25 simulated (8s)
+fold  8/25 simulated (8s)
+fold  9/25 simulated (8s)
+fold 10/25 simulated (8s)
+fold 11/25 simulated (8s)
+fold 12/25 simulated (8s)
+fold 13/25 simulated (8s)
+fold 14/25 simulated (8s)
+fold 15/25 simulated (8s)
+fold 16/25 simulated (8s)
+fold 17/25 simulated (8s)
+fold 18/25 simulated (8s)
+fold 19/25 simulated (8s)
+fold 20/25 simulated (8s)
+fold 21/25 simulated (8s)
+fold 22/25 simulated (8s)
+fold 23/25 simulated (8s)
+fold 24/25 simulated (8s)
+fold 25/25 simulated (8s)
+
+=== V1_5y: metric -0.0159 | return -0.8% | maxDD_mtm -51.6% | PF 1.009 | trades 6163.0 | gate FAIL | E4 metric -0.2571
+    [FAIL] folds with return>0 & PF>1: 14/25  (need >= 18 = ceil(70% of 25))
+    [FAIL] 10%-quantile fold PF: 0.79  (need >= 0.9)
+    [OK  ] mean trade-Sharpe: +0.06  (need > 0)
+
+=== V2_5y: metric -0.9676 | return -85.3% | maxDD_mtm -88.2% | PF 0.895 | trades 6702.0 | gate FAIL | E4 metric -0.8539
+    [FAIL] folds with return>0 & PF>1: 3/25  (need >= 18 = ceil(70% of 25))
+    [FAIL] 10%-quantile fold PF: 0.76  (need >= 0.9)
+    [FAIL] mean trade-Sharpe: -1.30  (need > 0)
+
+=== V1_10y: metric +4.2626 | return +126.2% | maxDD_mtm -29.6% | PF 1.113 | trades 3483.0 | gate FAIL | E4 metric +5.4268
+    [OK  ] folds with return>0 & PF>1: 11/15  (need >= 11 = ceil(70% of 15))
+    [FAIL] 10%-quantile fold PF: 0.82  (need >= 0.9)
+    [OK  ] mean trade-Sharpe: +0.75  (need > 0)
+
+=== V2_10y: metric -0.7247 | return -43.1% | maxDD_mtm -59.5% | PF 0.952 | trades 3852.0 | gate FAIL | E4 metric -0.4818
+    [FAIL] folds with return>0 & PF>1: 5/15  (need >= 11 = ceil(70% of 15))
+    [FAIL] 10%-quantile fold PF: 0.80  (need >= 0.9)
+    [FAIL] mean trade-Sharpe: -0.65  (need > 0)
+
+Total runtime 11s. report.json written.

@@ -734,3 +734,1138 @@ transfer-failure.**
 + 1×IQR vs 0.5×IQR vs paired-test, and (2) the first A/B recommendation. Phase C
 remains untouched — no variant code written, no config changed.
 
+---
+
+## Task 11 — Phase C BEGINS: trust investigation committed + ship rule RATIFIED  ✅ (2026-07-03)
+
+**Both Task-10 STOP items resolved by the reviewer:**
+1. **Ship-margin recalibration → RATIFIED (final; spends the one-time
+   recalibration).** Replaces the noise-sized "+10% relative" with the 0.5×IQR
+   combination: ship iff (a) Δmedian ≥ **0.21 ABSOLUTE** (0.5 × baseline seed-IQR
+   0.4188) AND (b) paired per-(fold,seed) **Wilcoxon signed-rank p<0.01** with
+   positive median delta AND (c) **≥4/5 seeds** beat the running-best median AND
+   (d) **no gate regression**. Recorded in doc 04 §2 (Phase A). Wired into new
+   `ab_report.py`. The +10% relative margin is retired.
+2. **First Phase-C A/B = turnover-aware reward** (reviewer's pick over the
+   cost-randomization runner-up), targeting investigation **RF-1**: the honest
+   baseline has a small GROSS edge that fair cost eats (94–125% of gross) with
+   35% of exits being direction-flips (each a full round trip). Goal: cut
+   low-conviction turnover so NET moves toward positive.
+
+**Task 0.1 — trust investigation committed (`19b5b6c`).** `06-baseline-trust-
+investigation.md` (the −0.526 anchor is TRUSTWORTHY under adversarial attack; the
+old +70% = 0.56× bull-beta + cost flattery, no demonstrable net edge) +
+`enhancements/06_investigation/` verification scripts (ruler-fairness, 2023
+spread, buy-and-hold facts).
+
+**Task 0.2 — `ab_report.py` (A/B comparator + ratified ship-rule evaluator).**
+READ-ONLY (does not touch the system under test): reads candidate + anchor
+`baseline_report.json` / summaries / per-job trade logs, evaluates the four legs
+(3-seed PREVIEW → 5-seed FINALIST), checks gate legs OK→FAIL per seed, and prints
+turnover diagnostics — trades/day, flip%, cost-as-%-of-gross, net PnL — that prove
+whether the mechanism engaged. Self-test vs the anchor reproduces trades/day
+**2.76**, flip **34.9%**, cost **107.8%** of gross (cross-checks the
+investigation's independently-derived figures).
+
+**Next:** Task 1 — implement `turnover_penalty_r` (config knob; reward-only entry
+penalty in `env_bracket.step`), PROVE penalty=0 reproduces the anchor
+bit-identically, unit-test. Task 2 — pin the level (~1× measured real per-trade
+cost ≈ 0.045 R) and launch the 3-seed A/B {42,43,44}. Anchor + honest ruler
+INVIOLATE; ONE change only; STOP after the 3-seed report.
+
+---
+
+## Task 12 — A/B #1 turnover reward: IMPLEMENTED + PENALTY PINNED + LAUNCHED (2026-07-03)
+
+**Task 1 — implemented (`37a593d`).** `turnover_penalty_r` (config default 0.0 =
+anchor; `TURNOVER_PENALTY_R` env override for candidate runs). `env_bracket.step`
+subtracts it from `reward` ONCE per NEW position opened (fresh entry OR the open
+leg of a flip), guarded so 0.0 is a strict no-op. Threaded through
+`train_ppo.build_env` + `run_pipeline`; stamped into `run_info.json`. **Isolation
+PROVEN two ways:** (1) unit test `checks/check_turnover_reward.py` — at penalty
+0.05 the equity / equity_mtm / trade log / return-over-MTM-DD metric are
+BIT-IDENTICAL to penalty 0, while total reward drops by exactly K·P on the K open
+steps and 0 elsewhere; (2) invariant rollout — the stored anchor `f01_s42`
+checkpoint rolled through the modified env at penalty 0 reproduces the anchor's
+`test_trades.csv` + `test_equity.csv` **byte-identically** (md5-equal) and
+`fold_metric` to 10 dp (0.6435982085). The honest (equity-based) ruler is
+untouched by construction.
+
+**Parity smoke (pre-launch, `--candidate`, penalty 0.045):** end-to-end verified
+that the launch env var reaches the job SUBPROCESS — `run_info.turnover_penalty_r
+= 0.045`, registry `cfg.turnover_penalty_r = 0.045` — and that `--candidate`
+leaves the running-best pointer on the anchor (smoke run + INDEX line reverted).
+
+**PENALTY PINNED — `turnover_penalty_r = 0.045 R` (first shot, pinned BEFORE
+launch, no result-tuning).**
+- *Anchor to real cost.* The anchor's measured mean real per-trade cost is
+  0.0683 / mean(sl_atr_mult 1.632) = **0.0447 R** (median 0.0455), from its actual
+  SL-bucket mix (2.0: 46%, 1.5: 35%, 1.0: 19%; 42,234 trades). 0.045 R ≈ **1×**
+  that. So the agent internalises the real round-trip spread a SECOND time —
+  "felt" cost ≈ 2× real — the textbook filter: only take trades expected to beat
+  ~2× cost. Directly targets **RF-1** (cost eats 94–125% of gross via 35%
+  flip-churn at ~2.76 trades/day).
+- *Scale.* ~0.045 × ~338 trades/episode ≈ 15 R vs a `val_r` signal of ±10–40 R —
+  a strong-but-not-idle turnover filter; per-entry it is a gentle 0.045 R nudge
+  against ±1–3 R trade outcomes. Expect a substantial (not total) turnover cut.
+- *Pre-committed follow-ups (no mid-run tuning):* improves NET & keeps eligibility
+  → extend to 5-seed finalist + full ratified ship rule; over-suppresses
+  (near-idle, eligibility collapse) → retry at 0.022 (0.5×); NET worse → kill.
+
+**Launch:** `TURNOVER_PENALTY_R=0.045 run_baseline.py --label turnover-p045-3seed
+--seeds 42,43,44 --concurrency 2 --candidate` — 25 folds × 3 seeds = 75 jobs, 3M
+steps each, ~8h. Same folds/budgets/gate as the anchor; ONLY the reward term
+differs. Lockbox (2024-07+) sealed. On completion: `ab_report.py` →
+per-seed + median-of-3 vs the −0.526 anchor, paired 75-pair Wilcoxon, turnover
+diagnostics (did turnover drop AND net improve?), 4-leg ship-rule PREVIEW.
+**STOP after the 3-seed report for sign-off.**
+
+---
+
+## Task 13 — A/B #1 turnover reward: 3-SEED REPORT  ✅ (2026-07-04) — STRONG, but NOT a preview-ship
+
+Run `20260704-034332_53fe6de_turnover-p045-3seed`: **75/75 jobs, 0 failures**,
+~5.4h. `turnover_penalty_r=0.045` (parity-verified in `run_info`/registry).
+Comparator: `ab_report.py --candidate <run>` → `ab_report.json`.
+
+### Headline — median-of-3 metric **+1.281** vs anchor **−0.526**  (Δ **+1.807**)
+Every one of the 3 shared seeds flips from a deep loss to a strong gain:
+
+| seed | metric cand→anchor | RET% cand→anchor | MTM-DD% cand→anchor | PF | trade-Sharpe | nTrades cand→anchor | folds+ |
+|---|---|---|---|---|---|---|---|
+| 42 | +1.281 ← −0.528 | +30.7 ← −33.5 | −24.0 ← −63.4 | 1.031 ← 0.984 | +0.26 ← −0.19 | 4000 ← 8451 | 15/25 ← 8 |
+| 43 | +0.526 ← −0.616 | +18.3 ← −38.7 | −34.9 ← −62.8 | 1.024 ← 0.979 | +0.18 ← −0.24 | 4376 ← 8318 | 15/25 ← 8 |
+| 44 | +2.092 ← −0.109 | +69.1 ← −4.8 | −33.1 ← −43.7 | 1.065 ← 1.004 | +0.45 ← +0.04 | 4429 ← 8650 | 11/25 ← 9 |
+
+### Mechanism ENGAGED exactly as hypothesised (RF-1 targeted)
+- **Turnover halved:** 1.39 vs 2.77 trades/day (Δ −1.37); trade count ~4,300 vs ~8,500.
+- **Flip-churn:** 25.1% vs 35.4% of exits (Δ −10.3 pts).
+- **Cost stops eating the edge:** cost = **68%** of gross vs **111%** (Δ −43 pts).
+- **Net cash −5,782 → +13,076** (Δ +18,858); PF crosses 1.0 on all seeds; MTM-DD ~halved.
+- Not an idleness/ratio artifact: still ~170 trades/fold, DD substantial (−24 to −35%),
+  returns genuinely positive. Isolation proof (Task 12) rules out equity leakage — the
+  gain is the POLICY dropping low-conviction (net-negative-after-cost) trades.
+
+### Ship-rule PREVIEW — 2/4 legs, **NOT a ship** (as expected at 3 seeds)
+- (a) Δmedian ≥ 0.21 : **PASS** (+1.807).
+- (b) paired Wilcoxon p<0.01 & median Δ>0 : **FAIL** — p = **0.030** (n=75, median paired
+  Δ +0.215): significant at 0.05 but not the ratified 0.01; the per-fold gain is real but
+  not yet uniform (several folds still negative).
+- (c) ≥4/5 seeds beat running-best : **3/3 beat** −0.526 but the leg needs 4/5 → resolvable
+  only at 5 seeds (preview limitation, not a failure of the idea).
+- (d) no gate regression : **PASS**.
+- **Deployment gate still 0/3.** The **mean-trade-Sharpe>0** leg now PASSES for all 3 seeds
+  (was failing); breadth (15/15/11 < 18) and q10 fold-PF (0.74–0.81 < 0.90) still FAIL.
+  A large step toward the gate, not through it.
+
+### Decision-log row (doc 04 §3)
+| change | seeds | dev-OOS Δmedian | per-fold Wilcoxon | compute | decision | notes |
+|---|---|---|---|---|---|---|
+| turnover_penalty_r 0→0.045 | 42,43,44 | **+1.807** (cand +1.281) | p=0.030, medianΔ +0.215 (n=75) | 75 jobs ~5.4h | **EXTEND (pending sign-off)** | mechanism confirmed (turnover −50%, cost/gross 111→68%, net +18.9k); ship-rule preview 2/4; gate 0/3 (Sharpe-leg now OK); running-best UNCHANGED |
+
+### Recommendation — **EXTEND to the 5-seed finalist** (awaiting sign-off)
+Meets the pre-committed follow-up ("improves NET & keeps eligibility → finalist"): the
+mechanism is confirmed, all 3 seeds beat the anchor by a wide margin, eligibility held
+(~0.33). The strict legs (Wilcoxon p<0.01, 4/5-seed) can only be settled at 5 seeds.
+Protocol: `--resume <run> --seeds 45,46 --candidate` (+50 jobs, ~5h) → re-run `ab_report`
+for the full ratified rule. **Do NOT ship on the preview; running-best stays the −0.526
+anchor. 5-seed extension launches only on reviewer sign-off.** **STOPPED per instruction.**
+
+---
+
+## Task 14 — A/B #1 turnover reward: 5-SEED FINALIST  ✅ (2026-07-04) — NO SHIP (rule working)
+
+Extended {45,46} into the SAME run (`--resume --candidate`, `TURNOVER_PENALTY_R=0.045`);
+125/125 jobs, all `run_info.turnover_penalty_r=0.045` (parity gate verified). Ran on the
+committed code that trained all 5 seeds identically (the two review-hardening edits were
+applied AFTER the run — see below).
+
+### Finalist — median metric **+1.281** vs anchor **−0.526** (Δ **+1.807**); all 5 seeds beat the anchor
+| seed | metric ← anchor | ret% | PF | trade-Sharpe | folds+ | gate |
+|---|---|---|---|---|---|---|
+| 42 | +1.281 ← −0.528 | +30.7 | 1.031 | +0.264 | 15/25 | FAIL |
+| 43 | +0.525 ← −0.616 | +18.3 | 1.024 | +0.183 | 15/25 | FAIL |
+| 44 | +2.092 ← −0.109 | +69.1 | 1.065 | +0.447 | 11/25 | FAIL |
+| 45 | +0.458 ← −0.526 | +18.2 | 1.024 | +0.179 | 10/25 | FAIL |
+| 46 | +2.079 ← +0.010 | +56.5 | 1.048 | +0.386 | 14/25 | FAIL |
+
+### RATIFIED ship rule — 3/4 legs, **SHIP = False**
+- (a) Δmedian ≥ 0.21 : **PASS** (+1.807)
+- (b) paired Wilcoxon p<0.01 & median Δ>0 : **FAIL — p = 0.0204** (n=125, median Δ +0.209)
+- (c) ≥4/5 seeds beat running-best : **PASS (5/5)**
+- (d) no gate regression : **PASS**
+
+**Why (b) fails despite the huge aggregate:** paired deltas are **74/125 improved, 51/125
+regressed** (mean Δ +0.341 > median +0.209). The lift is carried by large wins on a
+majority of folds while ~41% of cells get worse — a favorable *average trade-off*, not a
+*broad* improvement. The Wilcoxon leg exists precisely to withhold a ship in this case.
+**Deployment gate still 0/5** (breadth 10–15/25 < 18; q10 fold-PF 0.74–0.81 < 0.90; the
+mean-trade-Sharpe leg now PASSES all 5 seeds — real progress toward the gate).
+
+### Mechanism (5-seed, vs anchor, all seeds)
+trades/day 2.76 → **1.46**; flips 35% → **25.6%**; cost/gross **108% → 69%**; net cash
+**−6,902 → +21,679**. RF-1 lever confirmed at scale.
+
+### DECISION — **NO SHIP.** Running-best stays the −0.526 anchor.
+The ratified rule requires all four legs; (b) fails at p=0.020. **The pinned p<0.01 is NOT
+relaxed** (that would be the forbidden result-driven tuning). This is a *strong-but-not-
+broad* outcome — neither the "kill" (net is far better) nor the "over-suppressed→0.022"
+(not near-idle; 5/5 beat; eligibility held) pre-committed branch fires, so the next step is
+a reviewer decision. Turnover reduction is confirmed as the first-order lever; the flat
+0.045 penalty buys aggregate at the cost of per-fold consistency (the one failing dimension).
+
+### PR #2 review (Copilot) — all 5 comments interrogated + addressed
+- **env_bracket validate `turnover_penalty_r` finite/non-negative** (VALID, real footgun: a
+  negative value inverts the term into a churn REWARD; NaN/inf poisons the gradient) — fixed
+  at `__init__`; **neutral at 0.045** (unit test + byte-identical anchor `f01_s42` invariant
+  re-verified). Applied AFTER the run so all 125 jobs share identical training code.
+- **config: clearer `TURNOVER_PENALTY_R` parse error** (VALID, low-sev) — fixed.
+- **passive_ruler_check bull folds** (VALID: stale {9,25} contradicted the measured finding)
+  — now derived from measured gold B&H ≥ +8% (self-consistent; no headline changed).
+- **06-md / README "nothing touched sealed data"** (VALID precision, NOT a breach) — reworded:
+  no *model* train/eval touched the lockbox; raw-price market-fact reads (buy-and-hold) may
+  read beyond it. Lockbox intact.
+
+### Decision-log row (doc 04 §3)
+| change | seeds | Δmedian | Wilcoxon | gate | decision | notes |
+|---|---|---|---|---|---|---|
+| turnover_penalty_r 0→0.045 | 42–46 (finalist) | **+1.807** | **p=0.0204 (FAIL <0.01)** | 0/5 | **NO SHIP** | 5/5 seeds beat; mechanism confirmed (turnover −47%, cost/gross 108→69%, net +28.6k); fails per-fold consistency; running-best UNCHANGED |
+
+---
+
+## Task 15 — A/B #1b: turnover level SWEEP 0.022 (0.5×) — PINNED + LAUNCHED (2026-07-04)
+
+**Reviewer sign-off:** after A/B #1 finalist NO-SHIP, sweep the LOWER pre-declared level.
+This is a NEW A/B (new run dir, own pin), NOT a re-tune of #1.
+
+**PENALTY PINNED — `turnover_penalty_r = 0.022` (= 0.5× the anchor's measured mean real
+per-trade cost 0.0447; the pre-declared alternative level).**
+- *Hypothesis (from #1's failure):* A/B #1 (0.045) failed ONLY the paired-Wilcoxon
+  consistency leg — 74/125 folds improved but **51/125 regressed** (the flat penalty
+  over-suppresses ~41% of folds). Halving the penalty should push fewer folds into the red
+  → a MORE UNIFORM improvement that can clear p<0.01, at the cost of a smaller aggregate
+  median. The test: does 0.022 raise the improved:regressed ratio vs 0.045's 74:51 while
+  still beating the −0.526 anchor?
+- *Pre-committed reads (no mid-run tuning):* consistency improves + still beats anchor +
+  eligibility held → extend to 5-seed finalist (sign-off); aggregate edge collapses
+  (net back toward ≤0) → the flat penalty can't satisfy both aggregate AND consistency →
+  stop the level-sweep thread, move to A/B #2 (cost-domain randomization) or a
+  conviction-scaled redesign.
+
+**Code parity:** runs on the current review-fixed code (env/config input validation added
+after #1). Those edits are proven NEUTRAL at any penalty (byte-identical anchor `f01_s42`
+invariant + unit test re-verified), so this is still a clean one-change A/B vs the anchor
+(only `turnover_penalty_r`: 0 → 0.022). All 75 jobs share identical committed code.
+
+**Launch:** `TURNOVER_PENALTY_R=0.022 run_baseline.py --label turnover-p022-3seed
+--seeds 42,43,44 --concurrency 2 --candidate` — 75 jobs, ~5.4h. On completion: `ab_report`
+vs the anchor (ship-rule preview) PLUS a direct 0.022-vs-0.045 consistency comparison.
+**STOP after the 3-seed report for sign-off.**
+
+---
+
+## Task 16 — A/B #1b: 0.022 sweep — NO SHIP; flat-penalty level sweep CONCLUDED  ✅ (2026-07-04)
+
+Run `20260704-222152_49a9ef9_turnover-p022-3seed`: 75/75 jobs, all `turnover_penalty_r=0.022`
+(parity verified), running-best UNCHANGED. Hypothesis (a lower penalty improves per-fold
+consistency) is **REFUTED**.
+
+### Head-to-head vs the anchor (shared 3 seeds {42,43,44}, apples-to-apples)
+| level | median-of-3 | improved:regressed | medianΔ | Wilcoxon p | cost/gross | net cash |
+|---|---|---|---|---|---|---|
+| anchor | −0.5282 | — | — | — | 111% | −5,782 |
+| **0.022** | **−0.1687** | **42:33** | +0.080 | **0.4502** | 107% | −2,569 |
+| 0.045 | +1.2810 | 44:31 | +0.215 | 0.0304 | 69% | +21,679 |
+
+Per-seed (shared): s42 −0.528→(0.022)−0.030→(0.045)+1.281; s43 −0.616→**−0.750**→+0.525;
+s44 −0.109→**−0.169**→+2.092. **At 0.022, seeds 43 & 44 are WORSE than their own anchor.**
+
+### Ship rule (0.022 preview): 2/4 — NO SHIP
+(a) Δmedian≥0.21 PASS (+0.357); (b) Wilcoxon **p=0.45 FAIL** (noise); (c) n/a (2/3 beat,
+needs 5 seeds); (d) no gate regression PASS. Gate 0/3.
+
+### CONCLUSION — the FLAT turnover penalty cannot satisfy both aggregate AND consistency
+Two data points bracket it: the mechanism only bites at a STRONG penalty (0.045 cuts
+cost/gross 111%→69%, net −5.8k→+21.7k) but a strong *flat* penalty over-suppresses ~40% of
+folds (fails Wilcoxon, p=0.020); a WEAK penalty (0.022) barely reduces turnover (cost/gross
+→107%), collapses the aggregate, and does NOT improve consistency (42:33 vs 44:31) — it even
+degrades 2/3 seeds. **The level sweep is concluded — no flat level satisfies both; do not
+sweep further (e.g. 0.09 would deepen over-suppression).** Turnover reduction is confirmed as
+the first-order lever; the flat, indiscriminate penalty is the limitation. The fix must be
+SELECTIVE (tax low-conviction/low-edge entries, not all) or attack the root transfer-failure.
+
+### Decision-log rows (doc 04 §3)
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| turnover 0→0.022 | 42,43,44 | +0.357 | p=0.45 (FAIL) | **NO SHIP** | aggregate collapses; consistency NOT improved; degrades 2/3 seeds; concludes the flat-level sweep |
+
+### PR #2 review round 2 — all 4 comments addressed; all 9 threads resolved
+- `ab_report --anchor` now auto-resolves running-best from INDEX.md (`43a03ee`); leg(c)
+  shown `n/a — needs 5 seeds` in preview; INDEX 5-seed row relabeled (extended + NO-SHIP).
+- `run_baseline` fail-fast requires `--candidate` when `turnover_penalty_r!=0` (`0bb4972`) —
+  a variant can't silently move running-best; applied post-run; `--job` workers bypass it;
+  verified (fires w/o --candidate & creates no dir; workers unaffected; anchor not blocked).
+
+---
+
+## Task 17 — A/B #2: cost-domain randomization — IMPLEMENTED + PINNED + LAUNCHED (2026-07-04)
+
+Reviewer chose A/B #2 (cost-domain randomization) after the turnover-level sweep concluded.
+Targets the ROOT of the per-fold inconsistency: fits-train-fails-transfer (train+val− 33%).
+
+**Implemented (committed).** `cost_rand_frac` knob (config default 0.0 = anchor; `COST_RAND_FRAC`
+env override). In `env_bracket.reset()` the TRAIN env draws a per-episode multiplier
+`m ~ U[1−f, 1+f]` (mean 1.0) that scales `_half_cost`; at f=0 no RNG is drawn (bit-identical
+anchor). **TRAIN-ONLY:** `build_env`'s `cost_rand_frac` defaults to 0.0 and only the train
+builders (`_spawn_train_env`, n_envs=1 builder) pass `CFG.cost_rand_frac`; every eval/val/test
+rollout keeps 0.0 → the equity-based metric is NEVER randomized.
+
+**Isolation PROVEN.** (1) `checks/check_cost_randomization.py`: off-by-default no-op, multiplier
+mean-held (0.997≈1.0) in [0.6,1.4], validation rejects <0/≥1/NaN/inf. (2) RULER PROOF: a test
+rollout of the stored anchor `f01_s42` is **byte-identical** to the anchor at BOTH
+`cost_rand_frac=0.0` AND `0.4` — eval/metric pinned regardless of the training knob. (3) turnover
+unit test still green (no regression). Guard + registry extended to `cost_rand_frac`.
+
+**PIN — `cost_rand_frac = 0.4` (U[0.6, 1.4]), pinned BEFORE launch (no result-tuning).**
+- *Mean held at 1.0* → the measured cost LEVEL (spread 0.0623 / slip 0.0030) is unchanged; only
+  its DISPERSION is learned against. This isolates cost-ROBUSTNESS, not a cost-level change.
+- *±40%* = the pre-committed band (doc-11 recommendation). Real XAUUSD spread varies intraday/
+  by regime by well more than ±40%, so it's a moderate, plausible regularization strength.
+- *Hypothesis:* a policy over-fit to the exact pinned cost is brittle; training against a cost
+  band should regularize toward cost-robust (→ regime-robust) policies, raising val-transfer
+  (shrinking train+val−) and — the goal — improving per-fold CONSISTENCY (A/B #1's failing leg).
+  Secondary: flips are cost-sensitive, so churn may fall (measurable via flip%).
+- *Pre-committed reads (no mid-run tuning):* median beats anchor + Wilcoxon consistency + eligibility
+  held → extend to 5-seed finalist; no effect (median≈anchor, transfer quadrant unchanged) →
+  cost-robustness isn't the lever, move to A/B #3; worse → band too wide, retry 0.2 or conclude.
+
+**Launch:** `COST_RAND_FRAC=0.4 run_baseline.py --label costrand-p40 --seeds 42,43,44
+--concurrency 2 --candidate` — 75 jobs, ~5.4h. Same folds/budgets/gate as the anchor; ONLY
+`cost_rand_frac` differs. Lockbox sealed. On completion: `ab_report` vs anchor (ship preview) +
+transfer diagnostics (train+val− quadrant, flip%). **STOP after the 3-seed report for sign-off.**
+
+---
+
+## Task 18 — A/B #2: cost randomization 0.4 — NO SHIP; clean NULL result  ✅ (2026-07-05)
+
+Run `20260705-072309_c2eb933_costrand-p40`: 75/75 jobs, all `cost_rand_frac=0.4`,
+`turnover_penalty_r=0.0` (parity verified), running-best UNCHANGED. **The intervention moved
+nothing it was designed to move.**
+
+### vs the anchor (shared 3 seeds)
+| metric | anchor | costrand 0.4 | Δ |
+|---|---|---|---|
+| median-of-3 | −0.5282 | −0.5503 | **−0.024** |
+| Wilcoxon p (75 pairs) | — | **0.99** | medianΔ −0.025 |
+| improved:regressed | — | **37:38** | coin flip |
+| **train+val− quadrant** | **33.0%** | **34.5%** | unchanged |
+| train+val+ | 38.6% | 38.9% | unchanged |
+| eligibility | 0.386 | 0.389 | unchanged |
+| flip % | 35.4% | 34.3% | −1.1 (noise) |
+| net cash | −5,782 | −5,708 | +74 (noise) |
+
+Per-seed noise: s42 −0.550, s43 **+0.142**, s44 **−0.782** (one up, one down, one flat).
+Ship rule 1/4 (only 'no gate regression'); **SHIP preview = False**.
+
+### CONCLUSION — cost-robustness is NOT the lever; ruled out
+±40% mean-held cost randomization left the metric, the **train+val− transfer quadrant**, turnover,
+eligibility, and net all statistically unchanged (p=0.99). The dominant failure
+(fits-train-fails-transfer, 33%) is therefore **NOT cost-fragility** — plausibly because the cost
+is already ATR-relative (regime-invariant by construction), so there was little cost-brittleness
+to regularize away. Transfer failure is more likely **representation/feature overfitting** (the
+agent fits train-era price/feature patterns). Widening the band is unlikely to help (the
+mechanism didn't engage at all, not merely weakly). **Cost randomization is concluded — no ship.**
+
+### Phase-C picture so far (2 A/Bs, both NO SHIP; anchor −0.526 stands)
+- **A/B #1 turnover:** the ONLY lever that moved the metric strongly (net −5.8k→+21.7k at 0.045)
+  but fails per-fold consistency (flat penalty over-suppresses ~40% of folds); level sweep proved
+  no flat level satisfies both.
+- **A/B #2 cost-rand:** null — transfer isn't cost-driven.
+→ Next should either **salvage the confirmed turnover lever with a conviction-scaled (selective)
+penalty**, or attack the transfer overfitting from the **representation/regularization** side
+(the cost side is now ruled out).
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| cost_rand_frac 0→0.4 | 42,43,44 | −0.024 | p=0.99 | **NO SHIP** | null; train+val− 33→34.5% unchanged; cost-robustness not the lever; transfer failure is not cost-driven |
+
+---
+
+## Task 19 — A/B #3: flip-aware turnover penalty — IMPLEMENTED + PINNED + LAUNCHED (2026-07-05)
+
+Reviewer chose the flip-aware (conviction-scaled) turnover penalty to salvage A/B #1's lever.
+(The literal action-prob/value-scaled version was ruled out: the env reward can't cleanly see
+policy internals, and reward-by-value is circular with GAE — a heavier PPO-rollout change.)
+
+**Implemented (committed).** `turnover_entry_frac` knob (config default 1.0 = A/B #1 flat;
+`TURNOVER_ENTRY_FRAC` env override). In `env_bracket.step()` a NEW open carries a penalty weight:
+a **FLIP** pays the full `turnover_penalty_r`; a **FRESH** entry pays
+`turnover_penalty_r × turnover_entry_frac`. Reward-only, guarded no-op at penalty=0 or weight=0.
+
+**Isolation PROVEN.** `check_turnover_reward.py [4]`: entry_frac 1.0/0.0/0.5 → 4P/1P/2.5P penalty
+(the ACTIONS episode = 3 fresh + 1 flip), so **entry_frac=1.0 exactly nests A/B #1's flat 0.045**;
+equity/trade-log unchanged (reward-only). Anchor byte-identical invariant re-verified (turnover=0);
+cost-randomization unit test still green. run_info + registry record the knob.
+
+**PIN — `turnover_penalty_r = 0.045`, `turnover_entry_frac = 0.0` (tax FLIPS only).**
+- *Diagnosis of A/B #1's failure:* the flat 0.045 gave net −5.8k→+21.7k but over-suppressed ~40%
+  of folds because it taxed GOOD fresh entries too (failed Wilcoxon p=0.020).
+- *This A/B:* keep the validated per-open level 0.045 but charge it ONLY on flips (the 35%
+  flip-churn = low-conviction reversals); fresh directional entries pay nothing.
+- *Hypothesis:* reduces the reversal churn (preserving A/B #1's net benefit) WITHOUT suppressing
+  the high-conviction fresh entries → more UNIFORM per-fold improvement → clears the consistency
+  leg A/B #1 failed. Key comparisons: vs anchor (ship) AND vs A/B #1 flat (does sparing fresh
+  entries fix consistency?).
+- *Pre-committed reads:* consistency improves (Wilcoxon p<0.01) + beats anchor + eligibility held
+  → 5-seed finalist; aggregate collapses (net→≤0, i.e. the benefit needed the broad tax) →
+  flip-only insufficient, conclude; no change vs A/B #1 → flip-awareness doesn't matter (benefit
+  was total turnover reduction, not selectivity).
+
+**Launch:** `TURNOVER_PENALTY_R=0.045 TURNOVER_ENTRY_FRAC=0.0 run_baseline.py
+--label turnover-flipaware-p045 --seeds 42,43,44 --concurrency 2 --candidate` — 75 jobs, ~5.4h.
+Same folds/budgets/gate; only the turnover mechanism differs (flat→flip-aware). Lockbox sealed.
+On completion: `ab_report` vs anchor + consistency/flip% comparison vs A/B #1. **STOP for sign-off.**
+
+---
+
+## Task 20 — A/B #3: flip-aware turnover — NO SHIP; selectivity REFUTED, benefit is BROAD turnover  ✅ (2026-07-05)
+
+Run `20260705-164152_753beea_turnover-flipaware-p045`: 75/75 jobs, all
+`turnover_penalty_r=0.045 / turnover_entry_frac=0.0 / cost_rand_frac=0.0` (parity verified),
+running-best UNCHANGED. The penalty engaged HARD (flip% 35→8) but the net benefit evaporated.
+
+### Three-way (shared 3 seeds {42,43,44})
+| run | median-3 | total trades | flip% | cost/gross | net cash | vs-anchor consistency |
+|---|---|---|---|---|---|---|
+| anchor | −0.528 | 25,419 | 35.4 | 111% | −5,782 | — |
+| **A/B#1 flat 0.045** | **+1.281** | **12,805** | 25.1 | **68%** | **+13,076** | 44:31, p=0.030 |
+| **A/B#3 flip-only** | −0.499 | 21,243 | **8.1** | 118% | −6,695 | 39:36, **p=0.751** |
+
+Ship rule 1/4 (Δmedian +0.027, Wilcoxon p=0.75); **SHIP preview = False.**
+
+### CONCLUSION — flip-selectivity REFUTED; the turnover lever is a BROAD cost play
+Taxing ONLY flips crushed the flip fraction (35→8%) but the agent **substituted fresh-entry
+churn** — total trades fell only 16% (vs the flat penalty's 50%), so cost/gross stayed at 118%
+(no better than anchor) and net stayed negative. **A/B #1's +$13k came from halving TOTAL trades
+(→ halving cost drag), not from cutting flips specifically**, and that broad reduction cannot be
+targeted: spare any trade type and the churn migrates there. Consistency also did not improve
+(39:36, p=0.75). This confirms the pre-committed "benefit needed the broad tax" read.
+
+### Phase-C synthesis (3 A/Bs, all NO SHIP; anchor −0.526 stands)
+- **#1 turnover flat:** net +$13–28k by halving total turnover (cost drag) — but inconsistent
+  (broad suppression hurts ~40% of folds); no flat level fixes it.
+- **#2 cost-rand:** null (transfer isn't cost-driven).
+- **#3 flip-aware:** refuted — the turnover benefit is *total* cost reduction, entangled with the
+  over-suppression; it can't be made selective.
+→ The reward/cost side is largely exhausted: reducing turnover just trims COST drag on a
+near-zero-edge system (per the trust investigation, no real OOS edge). The net-vs-consistency
+tension is fundamental to a cost play. **The remaining unexplored lever is the EDGE itself —
+representation/features/regularization (attack the thin signal + train+val− overfitting), not the
+cost/turnover side.**
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| flip-aware (pen 0.045, entry_frac 0) | 42,43,44 | +0.027 | p=0.75 | **NO SHIP** | flip% 35→8 but net −6.7k (fresh-churn substitution); selectivity refuted; benefit needs broad turnover cut |
+
+---
+
+## Task 21 — Phase-C STRATEGIC REASSESSMENT (reviewer: step back)  ✅ (2026-07-05)
+
+After 3 A/Bs all NO SHIP, the reviewer chose to reassess rather than run A/B #4. Full memo:
+**`enhancements/07-phase-c-strategic-reassessment.md`**. Key conclusions:
+- The 3 A/Bs empirically confirmed the #1 weakness = **thin-signal transfer failure** (not
+  reward/cost), and that reward/cost shaping only trims cost drag on a near-zero-edge system.
+- The docs already prescribed the fix: **multi-instrument pooling** (doc 03 §3.7d "biggest
+  data-based defense"; doc 02 §1 "strongest available regularizer") — UNTRIED, and blocked on data
+  (XAUUSD only, verified).
+- **Recommendation:** pursue doc-02 pooling, de-risked by acquiring XAGUSD (+ maybe an FX major) and
+  running the ½-day Phase-0 similarity diagnostic BEFORE the ~1–2-week build; do NOT run more
+  reward/cost A/Bs (exhausted). **Pre-committed stopping rule:** pooling is the LAST major lever; if
+  it doesn't ship under the ratified rule, accept the honest negative result.
+- Anchor −0.526 stands; running-best unchanged; no training run for the reassessment.
+**Awaiting reviewer direction on the data-acquisition / pooling path.**
+
+
+---
+
+## Task 22 — SUPERVISED EDGE-CEILING PROBE — protocol PINNED (pre-launch, 2026-07-05)
+
+**Reviewer direction (2026-07-05):** before any pooling build, run a research-only supervised
+probe on the EXISTING XAUUSD data to decide between (a) no cost-clearing signal exists in the 25
+features at all vs (b) signal exists but is too thin/unstable for the RL layer to extract. This
+sharpens the enh/07 branch decision: if (a), invoke the stopping rule WITHOUT the pooling build.
+
+**Scope guard (hard):** research-only. No RL training, no env/config/feature changes, no data
+downloads, no lockbox access (feature frame truncated at `lockbox_start_date=2024-07-01` before
+labels exist), anchor and running-best untouched, no run-registry row / INDEX row (this is not a
+training run). Script + outputs live in `enhancements/08_probe/`; deliverable is
+`enhancements/08-*.md`.
+
+### Pinned protocol (everything below fixed BEFORE any label or metric is computed)
+
+**Data / folds / features — exact anchor reuse.** `train_ppo._load_decision_features()` (same M1
+CSV → H1 resample → `prepare_feature_frame`, start 2006-01-01) → `make_sliding_folds(feat, 5y/6m/
+6m/6m, embargo 200, lockbox 2024-07-01)`. Assert **25 folds** (identical to the anchor's). Inputs =
+the **25 market feature columns** from `features.py` only (no position-state features). Supervised
+fits use each fold's TRAIN window only; metrics reported on its TEST window (val untouched, mirrors
+the RL ruler's OOS unit). Entries sampled at EVERY H1 bar of the window.
+
+**Labels.**
+1. *k-bar forward return, ATR-normalized:* `y = (Close[t+k] − Close[t]) / ATR[t]`, **k ∈ {2, 4, 8}**
+   — pinned to the anchor's OOS holding-time distribution measured 2026-07-05 from the 125
+   `test_trades.csv` (42,234 trades): `bars_in_trade` p25/p50/p75 = 2/4/8. **k=4 (median hold) is
+   the primary regression config.**
+2. *Bracket-aligned TP-before-SL within horizon H=24 bars (~1 trading day):* brackets hung off
+   mid `Close[t] ± mult×ATR[t]` (cost handled in the clearance bar, not the label):
+   — *canonical* SL=1.0×ATR, TP=1R (PRIMARY; fastest-resolving, balanced classes);
+   — *modal-anchor* SL=2.0×ATR, TP=3R (secondary; the anchor's most-chosen bracket, 14.4% of trades).
+   Long AND short labels. H1 High/Low touch scan; both-touched-in-same-bar → SL first (env's
+   pessimistic convention); no touch within H → label 0 ("TP not reached first"). Label horizons
+   (≤24 bars) never cross the 200-bar embargo, so train labels cannot touch val/test bars.
+
+**Models (fixed hyperparameters, zero tuning anywhere).** Regression: `Ridge(alpha=1.0)` on
+train-fit standardized features; `HistGradientBoostingRegressor(max_iter=200, learning_rate=0.08,
+min_samples_leaf=50, l2_regularization=1.0, early_stopping=False, random_state=0)` (lightgbm not
+installed; sklearn 1.6.1). Classification: `LogisticRegression(C=1.0, max_iter=1000)` standardized;
+`HistGradientBoostingClassifier(same params)`.
+
+**Per-fold metrics.** Regression: OOS Spearman IC; TRAIN in-sample IC (supervised transfer gap —
+mirrors the RL train+val− quadrant); gross capture in ATR units `mean(y·sign(pred))` for (a) all
+bars, (b) top-|pred| quintile with the quintile threshold taken from TRAIN predictions (no test
+peeking). Classification: OOS AUC; base rate; TP-first rate of the top-decile-by-prob bars
+(decile threshold from TRAIN predictions). **Shuffled-label control:** per (fold × config), refit
+on train labels permuted with `seed=1000+fold`; OOS IC must be ~0 / AUC ~0.5 (harness-integrity
+gate: shuffled medians outside IC ±0.02 / AUC 0.48–0.52 → fix harness before interpreting).
+
+**Era-stability.** Eras pinned as consecutive fold quartiles by test-window start: E1=f01–06,
+E2=f07–12, E3=f13–18, E4=f19–25 (calendar spans reported). Note for the doc: OOS coverage is
+~2011H2→2024H1 (the anchor's full ruler span); 2006–2011 exists only as training history under
+this scheme — walk-forward coverage of the backbone is ~18.5y.
+
+**Cost-clearance bar (measured, from config — never tuned).** Round-trip = `spread_atr_frac +
+2×slippage_atr_frac = 0.0623 + 0.0060 = 0.0683×ATR` (commission $0.01/trade ignored, ~1bp of the
+per-trade risk budget). k-strategy clears when per-trade gross capture ≥ **0.0683** (y is already
+in ATR units; non-overlapping entries every k bars ⇒ one RT cost per k-bar trade). Bracket clears
+when TP-first rate ≥ p\* = (b + 0.0683)/(a + b) in SL-distance/ATR units: canonical p\* =
+1.0683/2 = **0.5342** (driftless base ≈ 0.50); modal p\* = 2.0683/8 = **0.2585** (base ≈ 0.25).
+
+**Verdict rules (pre-committed).** Verdict configs = {k=4 ridge, k=4 HGB, canonical-bracket
+logistic L/S, canonical-bracket HGB L/S}. Sign-consistency = OOS IC>0 in ≥18/25 folds (binomial
+p≈0.022) or era-median AUC ≥0.53 in ≥2 eras.
+- **NULL (case a):** no verdict config achieves sign-consistency AND no config clears cost
+  (era-median top-quintile capture ≥0.0683, or era-median top-decile TP-rate ≥ p\*) in ≥1 era →
+  recommend invoking the enh/07 stopping rule WITHOUT the pooling build.
+- **THIN-BUT-REAL (case b-thin):** sign-consistency somewhere, but cost clearance in <2 of 4 eras →
+  branch-B comparison (pooling vs per-fold train-window widening) decides next step.
+- **CEILING-CLEARS (case b):** some verdict config clears cost in ≥2 of 4 eras → signal exists;
+  RL extraction is the bottleneck; branch-B options are live.
+Secondary configs (k∈{2,8}, modal bracket, univariate per-feature IC screen) are diagnostic only —
+they cannot flip a NULL.
+
+**Widening arm (branch-B evidence, runs regardless of verdict).** Same protocol with 10y train
+windows (t0 pulled back 5y; same val/test windows) on the folds where 10y history exists (~f11+);
+paired per-fold OOS IC 5y-vs-10y, Wilcoxon. Context to record in 08: doc 02's pooling rationale
+("limited data") predates the 2026-07-02 switch to the 23-year backbone — the anchor already
+stands on ~18.5y of walk-forward coverage, so "more data" now has a no-new-instrument variant
+(wider per-fold train windows) that this arm measures directly.
+
+**Runtime plan:** ~910 sklearn fits (25 folds × 28 + widening arm), CPU-only, ~30–60 min local.
+
+### Task 22 RESULTS — VERDICT: `CEILING-CLEARS` (answer (b), with an era asterisk)  ✅ (2026-07-05)
+
+Probe ran clean: 25/25 fold boundaries asserted identical to the anchor's; 910 real + 350
+shuffled fits in 885s; **harness gate PASS** (shuffle median IC +0.0006, AUC 0.4968; per-fold
+noise band IC ±0.05); 0 NaN metrics; full report **`enhancements/08-supervised-edge-ceiling-probe.md`**.
+
+**Signal exists and clears the 0.0683-ATR bar — selectively and era-unevenly.**
+| config (5y) | E1 | E2 | E3 | E4 | verdict-rule outcome |
+|---|---|---|---|---|---|
+| fwd4·ridge top-q5 capture | **0.120** | **0.149** | **0.100** | 0.058 | clears 3/4 eras; IC>0 in 18/25 folds |
+| fwd4·HGB top-q5 capture | 0.065 | **0.181** | **0.101** | 0.011 | clears 2/4 eras; 19/25 |
+| canon-long·HGB top-decile TP (p\*=.5342) | **.551** | **.551** | **.550** | .531 | clears 3/4 eras |
+- All-bar capture 0.028–0.041 = **sub-cost even gross** → only top-quintile-selective trading
+  clears (IC_req for all-bar ≈ 0.052–0.059 vs observed 0.02–0.03).
+- **E4 (2020-07→2024-01) clears NOWHERE at 5y** — the deployment-adjacent era is the dead one.
+- Secondary: fwd8·ridge clears **all 4 eras** (E4 0.076); modal bracket has the best AUC (0.63)
+  but never clears its p\*=0.2585 (top-decile 0.15–0.24) — ranking ≠ clearing.
+- Transfer gap mirrors RL: HGB train IC **0.577** → OOS **0.030** (E4 ratio −0.6%); signal lives
+  in micro-seasonality/candle-shape features (dow_cos −0.028, tod_cos +0.020, lower_wick −0.019).
+- **Widening arm (pinned, neutral overall: p=0.17/0.36) rescues E4 specifically:** HGB q5-capture
+  0.011→**0.146**, folds clearing 2/7→**6/7**, ΔIC +0.018 with 7/7 improving (post-hoc era read,
+  flagged in 08 §8). E4 5y-death is substantially a **train-window artifact, not secular decay**.
+- **Extraction gap (vs anchor RL per era):** ceiling 0.120/0.181/0.101/0.058 vs anchor median ret
+  −1.9%/+7.2%/−5.3%/−2.7% — PPO profits only where the ceiling is 2.6× cost, loses in two eras a
+  fixed sklearn model cleared. Bottleneck = unselective extraction + memorization, not no-signal.
+
+**Recommendation (08 §7):** stopping rule NOT invoked (pinned NULL branch not taken).
+Branch-B: **RL A/B #4 = 10y train window** (folds 11–25, same val/test grid, ship rule unchanged
+— the only lever with measured supervised support, zero new data); pooling path continues per
+enh/07 with a **pooled-supervised-probe go/no-go inserted into Phase-0** (if pooled ceiling
+doesn't beat single-instrument in E3+E4 → invoke stopping rule WITHOUT the build; needs
+ratification). Mandatory E4-subset reporting for all future candidates (reporting only, not a
+gate). Doc-02 "limited data" context correction recorded (08 §6): rationale predates the
+2026-07-02 backbone switch by one day; anchor stands on 18.0y coverage — pooling's case is
+regularization + decay-testing, not scarcity.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| (research probe — no training run) | — | — | — | **CEILING-CLEARS** | supervised ceiling clears cost E1–E3 @5y, E4 rescued @10y; RL extraction is the bottleneck; next: A/B #4 (10y) + pooled-probe Phase-0 gate |
+
+---
+
+## Task 23 — SUPERVISED BASELINE THROUGH THE HONEST RULER — protocol PINNED (pre-launch, 2026-07-05)
+
+**Reviewer ratifications received (2026-07-05):** (1) pooled-probe go/no-go inserted into pooling
+Phase-0 (enh/08 §7.2); (2) **mandatory E4-subset (f19–25) reporting for all future candidates.**
+Task-22 commits pushed (`209179b..71d7529`).
+
+**Reviewer direction:** BEFORE A/B #4, convert the Task-22 ceiling into the anchor's own units —
+run the supervised strategy through the honest ruler (research-only) to (a) test whether the
+ceiling survives deployment mechanics (single position, compounding, MTM DD, gates) and (b) set
+the benchmark any RL candidate must beat to justify its complexity. **STOP for review after the
+deliverable; A/B #4 does not launch in this task.**
+
+**Scope guard (hard):** research-only. No RL training, no env/config change, no data downloads,
+anchor and running-best untouched, **no run-registry/INDEX row** (not a training run), lockbox
+untouched (identical frame/label construction to Task 22). Script + outputs in
+`enhancements/09_probe/`; deliverable `enhancements/09-*.md`.
+
+### Pinned protocol (fixed BEFORE any simulation is run)
+
+**Exactly two variants — no parameter search, failures reported as plainly as passes.**
+Score = **fwd4·ridge exactly as Task 22**: per fold, StandardScaler fit on TRAIN +
+`Ridge(alpha=1.0)`, trained on the fold's train-window rows with non-NaN fwd4 label; selection
+threshold = q80 of |train predictions| (train-derived, no test peeking). Trade only test bars with
+|score| ≥ threshold; direction = sign(score).
+
+- **V1 (time exit):** enter at the selected H1 bar's close; exit at the close of the **4th bar**
+  after entry (k=4); if the test window ends first, exit at the final bar close (`eow`).
+- **V2 (canonical bracket):** same entries; SL = entry − dir×**1.0×ATR_entry**, TP = entry +
+  dir×**1.0×ATR_entry** (TP=1R, distances from ENTRY price, mirroring `_open_position`);
+  H1 touch scan over bars t+1…t+24: gap-through at open fills at the OPEN (N1 mirror, reasons
+  `SL_gap`/`TP_gap`); both TP and SL touched in one bar → **SL first** (env's pessimistic
+  convention; ambiguous-bar count REPORTED as the fidelity bound vs the env's M1 fills);
+  no touch by t+24 → time exit at that close (`timeout`); window end → `eow`.
+
+**Mechanics (both variants, mirroring the env's formulas exactly):** one position at a time, no
+pyramiding, no flips; per bar exits are processed first, then entry if flat and selected
+(same-bar re-entry after an exit is allowed). Entry price = close + dir×half_cost; exit price =
+raw − dir×half_cost; half_cost = (spread_atr_frac/2 + slippage_atr_frac)×ATR_entry =
+0.03415×ATR_entry (BOTH legs at entry-bar ATR, as in `_entry_price`/`_exit_price`); commission
+$0.01/trade; **sizing = anchor's fixed-fractional**: units = equity×0.005/(1.0×ATR_entry) (risk
+unit = 1×ATR for both variants). Per-fold equity starts at 10,000; equity_mtm per bar = realized
+equity + unrealized at that bar's close.
+
+**Ruler reuse (the anchor's exact functions, unmodified):** per-fold `evaluate.full_report`
+(periods_per_year=6003) → per-fold return/PF/trade-Sharpe/MTM-DD; `run_baseline._stitch` →
+stitched OOS curve; `eval_harness.metric_return_over_mtm_dd` → THE metric;
+`train_ppo._passes_consistency_gate` → deployment gate. Supervised fits are deterministic —
+no seed dimension (noted vs the anchor's median-of-5).
+
+**Arms and comparisons:**
+- 5y arm: all 25 anchor folds → headline vs anchor **−0.5260**.
+- 10y arm: folds 11–25 (Task-22-validated widened boundaries: same val/test, t0 −5y).
+- Anchor sub-metrics for fair same-fold comparison: re-stitch the anchor's own per-job
+  `test_equity.csv` per seed over folds 11–25 and 19–25 → median-of-5.
+- **E4 subset (f19–25) reported for every variant** (per the ratified reporting rule), plus
+  per-era fold-metric medians E1–E4.
+- Diagnostics: n_trades, win rate, exit-reason mix, cost/gross, selected-bar fraction,
+  in-position skip rate, both-touch ambiguity count (V2).
+
+**Verdict question (pre-committed):** does selective supervised trading clear the ruler where PPO
+couldn't — metric > anchor's −0.5260 (and vs 0 = break-even), gate legs, and does it hold in E4?
+
+### Task 23 RESULTS — supervised baseline CLEARS the ruler in 1 of 4 cells (V1·10y); gate still FAILS; STOPPED for review  ✅ (2026-07-05)
+
+Ran in 11s, deterministic (no seeds). **Ruler reuse PROVEN:** re-stitching the anchor's own 125
+`test_equity.csv` through the identical function chain reproduced the ratified per-seed metrics
+(full-25 median −0.5260, <5e-4 per seed). Anchor sub-medians: **−0.7800** (f11–25), **−0.6606**
+(f19–25). Full report: **`enhancements/09-supervised-baseline-honest-ruler.md`**.
+
+| cell | folds | metric | return | PF | gate | E4 metric/return |
+|---|---|---|---|---|---|---|
+| anchor RL | 1–25 | −0.5260 | — | — | 0/5 | −0.66 / — |
+| V1·5y time-exit | 1–25 | −0.0159 | −0.8% | 1.009 | FAIL 14/25 | −0.26 / −8.6% |
+| V2·5y bracket | 1–25 | −0.9676 | −85.3% | 0.895 | FAIL 3/25 | −0.85 / −45.0% |
+| anchor RL | 11–25 | −0.7800 | — | — | — | −0.66 |
+| V1·5y | 11–25 | +0.0277 | +1.3% | 1.009 | — | −0.26 / −8.6% |
+| **V1·10y** | 11–25 | **+4.2626** | **+126.2%** | **1.113** | **FAIL: PF-floor 0.82<0.90 (breadth 11/15 OK, Sharpe +0.75 OK)** | **+5.43 / +80.3%** |
+| V2·10y | 11–25 | −0.7247 | −43.1% | 0.952 | FAIL 5/15 | −0.48 / −17.6% |
+
+**Findings:** (1) the enh/08 widening rescue CONVERTS to money through the honest ruler — same
+folds, same entries, 5y→10y flips +1.3%→+126.2%, E4 −8.6%→+80.3%, cost/gross 94%→56%, 11/15
+folds positive (not outlier-driven; weak era = E3, as the probe predicted). (2) **Execution
+geometry dominates:** identical entries under canonical brackets are destroyed (cost/gross 532%
+@5y; 50/50 SL:TP coin-flip vs the 53.4% the bracket needs; both-touch ambiguity only 1.7% — the
+pessimistic fill convention is NOT the cause). The env's bracket-mandatory action space makes the
+one execution mode the signal supports (time exit) the hardest to learn — pre-written post-mortem
+for A/B #4 if it fails. (3) No cell passes the ratified gate — V1·10y fails only the PF floor
+(f24 0.80/f16 0.81/f18 0.84); it is a **benchmark, not a deployment**. V1·5y ≈ 0 quantifies the
+probe→deployment conversion loss (single-position skips 45% of selected bars; compounding; DD).
+
+**Benchmark set for A/B #4 (folds 11–25): anchor −0.78; supervised V1·10y +4.26.** An RL
+candidate that ships under the ratified rule but lands far below +4.26 has not justified its
+complexity over a 26-line deterministic ridge rule.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| (research probe — no training run) | n/a (deterministic) | — | — | **BENCHMARK SET; STOP FOR REVIEW** | V1·10y +4.26/+126% clears ruler where PPO scored −0.78 (E4 +5.43); V2 bracket-execution destroys same signal; all gates FAIL (V1·10y: PF-floor only); A/B #4 NOT launched |
+
+---
+
+## Task 24 — A/B #4 (10y train window) GO + V3 modal-bracket diagnostic — PINNED (pre-launch, 2026-07-05)
+
+**Reviewer GO (2026-07-05), conditions verbatim:** 10y sliding train window, folds 11–25, 3-seed
+rank → **5-seed finalist only on reviewer sign-off**, ratified ship rule UNCHANGED, E4 subset
+reported. One diagnostic arm added to the Task-23 simulator (V3, below) — a diagnostic, NOT a
+candidate; no search; result reported either way. Then STOP for review with the A/B #4 3-seed
+preview and the diagnostic in ONE summary.
+
+### PRE-COMMITTED READINGS (recorded BEFORE any result exists; judgment keys on these)
+1. **Ships near the +4.26 supervised benchmark → RL justified.**
+2. **Ships far below +4.26 → RL complexity unjustified vs the 26-line ridge rule; the
+   action-space question is next.**
+3. **Fails the ship rule → the post-mortem is the Task-23 V1-vs-V2 execution gap, and the next
+   A/B is exit/action-space design — NOT more data and NOT pooling.**
+(The +4.26 benchmark is a judgment key, not a new ship-rule leg — the ratified rule is unchanged.)
+
+### A/B #4 launch pin
+- **Mechanism:** `SLIDING_TRAIN_YEARS=10` launch-time env-var override (new hook in `config.py`,
+  mirroring TURNOVER_PENALTY_R/COST_RAND_FRAC; committed default stays 5.0 → anchor reproduced
+  when unset). `run_baseline` non-anchor fail-fast guard extended (any
+  `sliding_train_years != 5.0` without `--candidate` refuses to launch); knob stamped into the
+  run registry.
+- **Fold-grid equivalence (the reason no fold code changes):** with train_years=10 the sliding
+  grid yields **15 folds whose val/test windows are BY CONSTRUCTION identical to the standard
+  grid's folds 11–25** (fold j: t0_j + 120m = t0_{j+10} + 60m, same day-of-month iterative
+  DateOffset arithmetic; train = the Task-22/23-validated widened window). Asserted pre-launch by
+  `checks/check_ab4_widening.py` against the Task-22 `fold_windows.csv`; launch aborts on any
+  mismatch. Anchor parity also asserted: env var unset → the 25 anchor folds byte-identical.
+- **Budget pin:** `total_timesteps=3M/fold UNCHANGED` (isolates the data lever at fixed
+  optimization budget — 2× data at the same compute; raising steps would confound). All other
+  training knobs untouched (n_envs 4, episode 2048, dd_penalty 0.8, eval cadence, PPO preset).
+- **Run:** seeds {42,43,44}, 45 jobs, concurrency 2, label `ab4-10y-3seed`, `--candidate`
+  (INDEX row per convention; running-best CANNOT move — ship decided by the A/B report).
+- **Comparison (bespoke `enhancements/10_ab4/ab4_report.py` — vanilla ab_report.py would mispair):**
+  ship-rule legs and constants IMPORTED from ab_report.py unchanged (Δmedian ≥ 0.21, paired
+  Wilcoxon p<0.01 positive, ≥4/5 seeds beat [n/a at 3-seed preview], no gate-leg regression);
+  pairing = candidate fold j ↔ anchor fold j+10, same seed (45 pairs at 3 seeds); anchor-side
+  comparator = the anchor run's own artifacts **re-stitched over folds 11–25 per seed** (method
+  proven in Task 23: full-25 re-stitch reproduced ratified per-seed to <5e-4):
+  **3-seed {42,43,44} median −0.8177** (preview stage), 5-seed −0.7800 (finalist stage);
+  anchor gate legs recomputed per seed on the same fold subset. **E4 = candidate folds j=9–15
+  (std f19–25) stitched, vs anchor E4 3-seed −0.6606** (5-seed −0.6606). Supervised benchmark
+  **V1·10y +4.2626 (E4 +5.4268)** recorded alongside every table (reading key #1/#2).
+- 5-seed extension (seeds 45,46 via `--resume`) ONLY on reviewer sign-off.
+
+### V3 diagnostic pin (research-only, runs alongside; one variant, zero search)
+**V3 = Task-23 V1 entries (fwd4·ridge top-quintile |score|, train-q80 threshold, direction =
+sign) executed under the MODAL bracket: SL 2.0×ATR, TP 3R (= 6×ATR from entry), H=24.** All other
+conventions byte-identical to V2's pin: brackets from entry price, H1 touch scan t+1…t+24,
+gap-through fills at open, both-touch-in-bar → SL first (ambiguity counted), timeout → close of
+t+24, `eow` at window end; sizing at the ACTUAL SL distance (units = 0.005×equity/(2.0×ATR),
+env formula); costs/commission/ruler/gate identical; arms 5y (folds 1–25) and 10y (folds 11–25)
++ the 5y folds-11–25 sub-cut; era medians + E4 reported. Implementation: `simulate()` gains
+explicit (sl_mult, tp_r) parameters with canonical defaults (V1/V2 cells unchanged — reproduced
+byte-identical before V3 runs); V3 driver in `enhancements/10_ab4/v3_modal_diagnostic.py`.
+**Purpose:** V2 showed the canonical bracket destroys the signal; V3 bounds whether ANY bracket
+in the env's menu (its widest) can monetize the 4-bar drift — pinning A/B #4's failure
+attribution (action-space geometry vs optimization) BEFORE the RL result is known.
+
+### Task 24 — V3 diagnostic RESULT (recorded while A/B #4 trains; run `20260707-012025_4fa6046_ab4-10y-3seed` in flight)  ✅ (2026-07-06)
+
+Pre-flight PASS (parameterized `simulate()` reproduced the committed Task-23 V1/V2 fold-11 rows
+to <1e-9). One variant, zero search, 10s runtime. Artifacts `enhancements/10_ab4/v3_report.json`.
+
+| cell | folds | metric | return | PF | gate | E4 metric / return | exit mix |
+|---|---|---|---|---|---|---|---|
+| V3·5y | 1–25 | +0.0445 | +1.8% | 1.011 | FAIL | +1.36 / +24.7% | SL 52% / timeout 38% / TP 9% |
+| **V3·10y** | 11–25 | **+1.6896** | **+32.6%** | 1.067 | FAIL | **+3.36 / +46.8%** | SL 50% / timeout 40% / TP 9% |
+| V3·5y | 11–25 | +0.6791 | +13.5% | 1.034 | FAIL | +1.36 / +24.7% | — |
+
+**Reading (pinned purpose: bound what the env's bracket menu can express):** the modal bracket
+does NOT destroy the drift signal the way the canonical one did — it monetizes **≈27% of the
+time-exit result** (+1.69 vs V1·10y's +4.26 on the same folds; E4 +3.36 vs +5.43). Mechanism
+visible in the exit mix: 40% of positions reach the 24-bar timeout (de-facto time exits), the
+2.0×ATR stop truncates the rest; the 6×ATR TP almost never fires (9%). **The action space is not
+a brick wall — a fixed rule expressible in the env's own menu (widest bracket + 24-bar close
+discipline) reaches +1.69 on A/B #4's exact folds.** This refines the pre-committed failure
+attribution BEFORE the RL result is known — the decision ladder on folds 11–25 is now:
+
+> anchor RL −0.8177 (3-seed) · **bracket-expressible supervised ceiling V3 +1.69** ·
+> time-exit supervised ceiling V1 +4.26
+
+- A/B #4 lands ≈ 0 or below → optimization/extraction failure, NOT action-space impossibility
+  (V3 proves +1.69 is expressible with brackets); reading #3's "exit/action-space design next"
+  should then target *learnability* (e.g. explicit close-timer/exit head), not menu width alone.
+- A/B #4 lands ≈ V3 (+1.7-ish) → bracket geometry is the binding loss vs +4.26 → action-space
+  question (reading #2) with V3 as the measured bracket ceiling.
+- A/B #4 near +4.26 → reading #1 (RL justified) — it would have beaten every fixed rule.
+
+### Task 24 RESULTS — A/B #4 3-seed preview: NO SHIP (leg a −0.0001, leg b p=0.25); reading #3 branch with V3 refinement — STOPPED for review  ✅ (2026-07-07)
+
+Run `20260707-012025_4fa6046_ab4-10y-3seed`: **45/45 jobs**, ~9.8h compute, aggregate + INDEX row
+written (candidate convention), **running-best UNCHANGED**. Registry stamped
+`sliding_train_years: 10.0`; anchor parity + grid equivalence asserted pre-launch
+(`checks/check_ab4_widening.py` all PASS). Ship-rule evaluation:
+`runs/…/ab4_report.json` (bespoke fold j↔j+10 pairing, ratified legs imported unchanged).
+
+| seed | cand metric (f11–25) | ret | PF | anchor same-seed sub | seed-paired |
+|---|---|---|---|---|---|
+| 42 | −0.4044 | −18.7% | 0.984 | −0.9035 | improved |
+| 43 | −0.6078 | −36.1% | 0.961 | −0.8177 | improved |
+| 44 | −0.7997 | −54.7% | 0.929 | −0.4209 | REGRESSED |
+
+**Ship legs (3-seed preview):** (a) Δmedian +0.2099 vs −0.8177 → **FAIL by 0.0001**;
+(b) paired Wilcoxon p=0.2476, median paired Δ +0.038, 45 pairs → **FAIL** (the improvement is not
+fold-consistent); (c) 3/3 beat the anchor sub-median (informational at preview; seed-paired view
+is 2/3); (d) no gate regression → PASS (all gates FAIL both sides). **SHIP_preview = False.**
+**E4 (f19–25):** candidate median −0.0948 (per-seed −0.09/+0.56/−0.37) vs anchor −0.6606 —
+improved ≈+0.57 but still ≈0.
+
+**The pre-committed ladder (folds 11–25):**
+anchor RL −0.8177 → **A/B #4 PPO·10y −0.6078** → V3 bracket-expressible ceiling **+1.69** →
+V1 time-exit ceiling **+4.26**.
+
+**Reading applied (pinned before launch): #3-with-V3-refinement.** The candidate fails the ship
+rule and lands *below zero* — far below the +1.69 a fixed rule reaches inside the env's own
+bracket menu on identical folds/data. Attribution is therefore **optimization/extraction failure,
+NOT action-space impossibility and NOT data quantity**: the 10y window that converted the
+supervised rule from +0.03 to +4.26 moved PPO by only ~+0.21 (and inconsistently, p=0.25).
+Supporting diagnostics: eligible-eval fraction FELL 0.386→0.272 and the train−val− quadrant grew
+to 32% (vs anchor ~16%) — at fixed 3M steps over 2× data, PPO fit the train leg *less* often and
+converted none of the regularization into transfer; churn persisted (flip 32.5%, ~280
+trades/fold). **Per the pin: next A/B = exit/action-space LEARNABILITY design (e.g. explicit
+close-timer/exit head so the 24-bar close discipline is a parameter, not a discovered behavior)
+— NOT more data, NOT pooling.**
+
+**5-seed extension math (flag, decision is reviewer's):** at the finalist stage the comparator
+hardens to −0.7800 (5-seed), so shipping would need the 5-seed candidate median ≥ −0.57 (both new
+seeds landing above −0.57) AND leg b to move from p=0.25 to p<0.01 — implausible; extension looks
+unjustified under the ratified rule.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| A/B #4 sliding_train_years 5→10 (folds 11–25) | 42,43,44 | +0.2099 (vs −0.8177 sub-anchor) | p=0.248 | **NO SHIP (preview); STOP FOR REVIEW** | below V3 bracket ceiling +1.69 and V1 +4.26; E4 −0.66→−0.09; reading #3: exit/action-space learnability next; 5-seed extension implausible under rule |
+
+### Task 24 — reviewer decision: A/B #4 preview NO-SHIP ACCEPTED; NO 5-seed extension  (2026-07-07)
+
+Reviewer accepted the 3-seed preview NO-SHIP as final for A/B #4. **Extension declined on the
+recorded implausibility math** (restated for the record): at the finalist stage the comparator
+hardens from −0.8177 (3-seed sub-anchor) to **−0.7800** (5-seed), so leg (a) would need the
+5-seed candidate median ≥ **−0.57** — i.e. BOTH new seeds (45, 46) landing above −0.57 while the
+existing three sit at −0.40/−0.61/−0.80 — AND leg (b) would need the paired Wilcoxon to move from
+**p=0.248 to p<0.01** on 75 pairs with the same fold pattern. Neither is plausible; extension
+would spend compute to confirm a NO-SHIP. Running-best unchanged; A/B #4 closed.
+
+---
+
+## Task 25 — A/B #5: entry-time HOLD-HORIZON COMMITMENT (final end-to-end RL attempt) — PINNED (pre-launch, 2026-07-07)
+
+**Reviewer direction:** per the Task-24 pinned lever (exit/action-space LEARNABILITY), one final
+end-to-end RL attempt: give the agent an explicit exit-timing head so the close discipline is a
+PARAMETER chosen at entry, not a behavior PPO must discover. Two tracks run in parallel: this
+A/B (Track 1) and the enhancements/11 supervised-hardening PROPOSAL (Track 2, write-only, no
+execution). STOP after both for combined review.
+
+### Mechanism (candidate-only; anchor path byte-identical when knob unset)
+- **Action space:** `MultiDiscrete([3, 3, 4])` → **`MultiDiscrete([3, 3, 4, 4])`** — 4th head =
+  hold-horizon choice **k ∈ {2, 4, 8, 24}** decision bars, committed at entry (menu = the
+  Task-22 pinned holding percentiles {2,4,8} + the V3 close-discipline horizon 24).
+- **Auto-flatten:** at the TOP of `step()` (before that bar's action is applied): if
+  `bars_in_trade ≥ hold_bars`, close at the current bar's close, exit-side half-cost at entry
+  ATR (manual-close pricing), new `exit_reason="horizon_close"`. Timing matches the Task-23/V3
+  convention exactly: brackets keep priority over the full M1 interior through bar t+k (the
+  existing fill loop runs unchanged); the flatten prices at close[t+k]; same-bar re-entry is
+  possible via the normal entry block (a fresh entry with fresh costs). Early exits (manual/flip)
+  remain allowed — k is a hard CEILING on holding time; a flip restarts the clock with the new
+  entry's chosen k.
+- **Brackets stay as protection:** SL/TP menu, sizing, costs, reward terms all UNCHANGED. No
+  reward-shape change — this is an architecture A/B.
+- **Observation:** position-state block gains ONE feature (6→7): remaining-hold fraction
+  `(hold_bars − bars_in_trade)/hold_bars` (0 when flat). Without it the sampled commitment would
+  be invisible to the policy/value net (memoryless MLP) — the learnability being tested requires
+  observing the commitment. Market features untouched. Anchor obs (knob off) byte-identical.
+- **Plumbing (established candidate pattern):** config knob `hold_horizon_bars: Tuple = ()`
+  (empty = anchor) + `HOLD_HORIZON_BARS` env-var hook; env validates canonically; `build_env`
+  passes it through; `run_baseline` fail-fast guard extended (non-empty menu requires
+  `--candidate`) + registry stamp. Trade log gains `hold_bars` column (chosen-k diagnostics).
+- **Pre-launch checks (`checks/check_ab5_hold_horizon.py`):** anchor parity (knob off → action
+  space (3,3,4), obs 31, hold branch dead); synthetic-data unit tests (flat prices, wide
+  brackets): horizon fires at exactly k bars with `horizon_close` reason + manual-close pricing;
+  brackets-first priority; flip restarts the clock; early manual close allowed; same-bar
+  re-entry after flatten; launcher guard refusal; config parse (valid/invalid).
+
+### Run pin
+`HOLD_HORIZON_BARS=2,4,8,24` + `SLIDING_TRAIN_YEARS=10`, **3M steps/fold UNCHANGED**, folds
+11–25 (the 10y grid, equivalence already asserted in Task 24), seeds {42,43,44} (3-seed
+preview), concurrency 2, label `ab5-holdhorizon-10y-3seed`, `--candidate`. Ship-rule evaluation
+via the Task-24 `ab4_report.py` verbatim (same folds, same anchor sub-stitch comparators
+−0.8177 3-seed / −0.7800 5-seed / E4 −0.6606, same pairing j↔j+10, ratified legs unchanged).
+E4 subset + per-era medians reported (ratified rule). 5-seed extension only on reviewer sign-off.
+
+### PRE-COMMITTED READINGS (verbatim from reviewer, recorded before any result)
+(i) **Ships vs anchor = necessary but not sufficient.**
+(ii) **≥ V3 +1.69 = evidence RL is learning the exit game.**
+(iii) **~ +4.26 = justifies RL complexity.**
+(iv) **TERMINAL RULE: if this fails, the end-to-end RL line is CLOSED as an architecture
+negative — future RL only as a hybrid (supervised signal in obs) research item.**
+
+### Known caveat + pre-defined follow-up permission (pinned BEFORE launch)
+3M steps over 10y underfits (A/B #4: eligible-eval fraction 0.386→0.272; train−val− quadrant
+→32%). A steps-scaled follow-up (6M steps, everything else identical) is permitted ONLY if A/B #5
+shows the **positive-but-underfit signature**, ALL of:
+1. SHIP_preview = False but **Δmedian > 0** (3-seed median above −0.8177);
+2. **eligible_eval_fraction ≤ 0.32**;
+3. **train−val− share ≥ 25%** of total eval sign counts;
+4. late-peaking diagnostic reported (share of jobs whose best eligible eval falls in the final
+   25% of that job's evals) — supporting evidence, NOT a gate leg.
+Any other failure shape → reading (iv) TERMINAL RULE fires with no follow-up.
+
+**Additional pinned diagnostics to report:** chosen-k distribution (trade-log `hold_bars`),
+`horizon_close` share of exits, flip%, eligibility, exit-reason mix vs A/B #4.
+
+### Task 25 RESULTS — A/B #5 3-seed preview: NO SHIP (leg b), but FIRST-EVER leg-a pass + pinned underfit signature HOLDS → 6M follow-up PERMITTED; terminal call is reviewer's  ✅ (2026-07-07)
+
+Run `20260707-135547_1142ac3_ab5-holdhorizon-10y-3seed`: 45/45 jobs, ~10.2h compute, candidate
+INDEX row, running-best UNCHANGED. Ship-rule evaluation (Task-24 ab4_report.py verbatim):
+`runs/…/ab4_report.json`.
+
+| seed | metric (f11–25) | ret | PF | folds+ |
+|---|---|---|---|---|
+| 42 | −0.6565 | −35.3% | 0.952 | 6/15 |
+| 43 | −0.5544 | −27.5% | 0.971 | 4/15 |
+| 44 | −0.6060 | −36.3% | 0.956 | 3/15 |
+
+**Legs:** (a) Δmedian **+0.2117 ≥ 0.21 → PASS — the first leg-a pass of Phase C**;
+(b) paired Wilcoxon p=0.623 with **median paired Δ −0.075 (negative!)** → FAIL — the stitched
+improvement is concentrated in a few folds while the typical fold is slightly worse;
+(c) 3/3 seeds beat −0.8177 (informational); (d) no gate regression. **SHIP_preview = False.**
+**E4:** candidate median **−0.0294** vs anchor −0.6606 (s43 **+0.7435** — a positive E4 seed).
+**Ladder:** anchor −0.8177 → #4 −0.6078 → **#5 −0.6060** → V3 +1.69 → V1 +4.26. Headline
+unchanged vs #4; seed spread tightened (0.10 vs 0.40).
+
+**Pinned readings applied:** (i) ships vs anchor — NO. (ii) ≥ V3 +1.69 — NO. (iii) ~+4.26 — NO.
+(iv) TERMINAL RULE — **suspended by the pre-defined exception**: the positive-but-underfit
+signature HOLDS on all three hard legs: Δmedian +0.2117 > 0 ✓; eligible_eval_fraction
+**0.1533** ≤ 0.32 ✓ (anchor 0.386 → #4 0.272 → #5 0.153 — eligibility halves each time capacity/
+data grow at fixed 3M steps); train−val− share **41.6%** ≥ 25% ✓ (anchor ~16%, #4 32%).
+Late-peaking diagnostic (non-gating): **8/45 = 18%** — lukewarm; most best-checkpoints are NOT
+late, which tempers the pure more-steps story.
+
+**Mechanism diagnostics (pinned): the exit head WORKS mechanically —**
+`horizon_close` = **31.8%** of 15,547 OOS exits (the #1 exit reason); chosen-k spread over the
+whole menu (24: 33.5%, 8: 31.3%, 4: 20.9%, 2: 14.3%); median hold 4 bars = the supervised sweet
+spot; **flip churn HALVED** (32.5% → 15.5%); TP exits 7.9%. The agent adopted V1/V3-shaped exit
+behavior — **and the money did not follow** (−0.61 ≈ #4's −0.61). The exit game is being played;
+the ENTRY signal PPO learns still is not the ridge signal. Consistent with Task-22/23: the edge
+is entry-side selectivity; exits were the monetization multiplier, not the source.
+
+**Recommendation (decision is reviewer's):** spend the pre-authorized **6M-steps follow-up**
+(everything else identical, 3-seed) as the terminal-rule tiebreaker — closing the end-to-end
+line on a run whose training-side underfit markers are this loud (eligible 0.153) would leave
+the architecture negative contestable; pre-commit that if the 6M run also fails the ship rule,
+the TERMINAL RULE fires with no further appeal. Honest counter-evidence for firing it NOW
+instead: late-peak only 18%, leg-b paired median negative, and #4→#5 headline unchanged — all
+pointing at entries-not-optimization, which more steps may not fix.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| A/B #5 hold-horizon head (k∈{2,4,8,24}) @10y | 42,43,44 | **+0.2117** (leg-a PASS, first ever) | p=0.623, paired med −0.075 | **NO SHIP (preview); underfit signature HOLDS → 6M follow-up PERMITTED; STOP FOR REVIEW** | exit head adopted (horizon_close 31.8%, flip 32.5→15.5%) but money unchanged (−0.61); E4 −0.66→−0.03; terminal call deferred to reviewer |
+
+---
+
+## Task 26 — A/B #5b 6M TERMINAL-RULE TIEBREAKER + enh/11 EXECUTION (amended A1–A3) — PINNED (pre-launch, 2026-07-07)
+
+**Reviewer decisions (2026-07-07):** (1) GO on the pre-authorized 6M-steps follow-up;
+(2) enh/11 APPROVED with amendments A1 (economic-viability floor ≥ +63.1% stitched return),
+A2 (E3 diagnosis runs FIRST), A3 (passing cell → separately pinned enh/12 report-only robustness
+battery [q75/q85 threshold perturbation, ridge-alpha perturbation, cost +25% stress]; lockbox
+sealed until enh/12 exists and passes review). Amendments incorporated into
+`enhancements/11-supervised-hardening-proposal.md` before this pin. Both tracks run in parallel
+(no shared state: the 6M pool is RL training in `runs/`; the hardening cells are deterministic
+sklearn/pandas over committed artifacts). STOP when both land; joint summary.
+
+### Track 1 pin — A/B #5b (6M steps)
+- **Identical to Task 25 in every respect except `--steps 6000000`:** HOLD_HORIZON_BARS=2,4,8,24,
+  SLIDING_TRAIN_YEARS=10, folds 11–25, seeds {42,43,44}, concurrency 2, `--candidate`, label
+  `ab5b-holdhorizon-10y-6M-3seed`. Eval COUNT unchanged (eval_freq = steps//20 → 20 evals/job),
+  so eligibility/late-peak numbers are directly comparable to 3M. Comparators and ship rule
+  unchanged (anchor sub −0.8177 3-seed / −0.7800 5-seed / E4 −0.6606; ab4_report.py verbatim).
+- **(i) TERMINAL-RULE TIEBREAKER:** if this run fails the ship rule, the TERMINAL RULE fires
+  AUTOMATICALLY — the end-to-end RL line is CLOSED as an architecture negative. No new
+  signature, no appeal, no further steps-scaling.
+- **(ii) Mandatory result diagnostics:** eligible-eval fraction, train/val sign quadrants,
+  late-peaking % (same operational definition as Task 25), horizon_close share + chosen-k mix —
+  the underfit hypothesis gets its definitive answer either way.
+- **(iii) Pre-recorded interpretation:** if the eligible fraction recovers materially at 6M and
+  the money still does not move, the post-mortem conclusion is **"fit restored, transfer still
+  absent — entry selectivity unlearnable from this reward signal."**
+
+### Track 2 pin — enh/11 execution (order per A2)
+1. **E3 diagnosis first** (analysis-only; no-parameter-change rule in force): Q1 loss
+   concentration (worst-10-trades share, f15/f16/f18), Q2 long/short capture asymmetry,
+   Q3 univariate era-IC persistence (from Task-22 CSV), Q4 vol-regime percentile of bad folds
+   (trade-log proxy: per-fold mean entry_atr/entry_price — pinned as proxy). Inputs are all
+   committed artifacts; output `enhancements/11_hardening/e3_diagnosis.json` + doc section.
+2. **Then the three cells** (constants frozen in enh/11 §2): H1 = protective SL 2.0×ATR_entry
+   (intrabar H1-touch, gap-through at open, NO TP), time exit k=4 unchanged, sizing unchanged;
+   H2 = per-entry risk scale `max(0.25, min(1, median_train(atr_close)/atr_close[t]))`, no stop;
+   H3 = both. Runner: new script `enhancements/11_hardening/run_hardening.py`; **pre-flight must
+   reproduce the committed V1·10y per-fold rows exactly** (stop off, scale 1) before H-cells run.
+   Folds 11–25 (10y arm) only. Reporting per enh/11 §2: full ruler row + all gate legs +
+   **A1 viability floor (stitched return ≥ +63.1%)** + E4 subset + per-era medians + exit mix +
+   f15/f16/f18/f24 fold table. Success/stop/enh-12 clauses per amended §3.
+
+### Task 26 — Track 2 RESULTS: E3 diagnosis + H1/H2/H3 — ALL CELLS FAIL THE PF FLOOR; hardening line STOPPED per pre-commit  ✅ (2026-07-07)
+
+Diagnosis first (A2): tails UNIFORM across folds (25–30% worst-10 share in winners too);
+E3 weakness = short-side bleed in low-vol chop (f15 13th / f16 27th vol pct); 3/6 features alive.
+Pre-declared reading: H1 nominally confirmed (with uniform-tails caveat), H2 mechanism-suspicious.
+Cells (BASE pre-flight reproduced committed V1·10y exactly): H1 +89.6% floor 0.82 (f24 WORSE
+0.798→0.722; stop cuts winners too — caveat vindicated); H2 +122.0% floor 0.84 (fixed exactly the
+one high-vol bad fold f18 0.840→0.899 — suspicion vindicated); H3 +92.8% floor 0.83. All pass the
+A1 viability floor (+63.1%); **all fail the PF-floor leg → per §3 the hardening line STOPS; no
+enh/12 trigger.** V1·10y = benchmark, not deployable. Next supervised step (if any) = NEW pinned
+proposal (E3 short-side/regime handling, or 15y window) — reviewer's call.
+Full tables: enh/11 RESULTS section; artifacts `enhancements/11_hardening/`.
+
+### Task 26 — Track 1 RESULTS: A/B #5b (6M) NO SHIP → **TERMINAL RULE FIRED — end-to-end RL line CLOSED as an architecture negative**  ✅ (2026-07-08)
+
+Run `20260707-233218_d7b5ed4_ab5b-holdhorizon-10y-6M-3seed`: 45/45 jobs (~20h compute), candidate
+INDEX row, running-best UNCHANGED. Ship-rule evaluation (`ab4_report.py`): `runs/…/ab4_report.json`.
+
+| seed | metric (f11–25) | ret | PF | folds+ | E4 metric |
+|---|---|---|---|---|---|
+| 42 | −0.7519 | −40.3% | 0.945 | 4/15 | −0.3851 |
+| 43 | −0.1316 | −6.1% | 1.001 | 6/15 | **+1.5575** |
+| 44 | −0.5011 | −25.1% | 0.975 | 5/15 | −0.4682 |
+
+**Legs:** (a) Δmedian **+0.3166** vs −0.8177 → PASS (comfortable now); (b) Wilcoxon **p=0.1228**,
+median paired Δ +0.1038 (positive, was −0.075 at 3M) → **FAIL**; (c) 3/3 informational; (d) no
+regression. **SHIP_preview = False → per the Task-26 pin the TERMINAL RULE FIRES AUTOMATICALLY:
+the end-to-end RL line is CLOSED as an architecture negative. No new signature, no appeal.**
+
+**Mandatory diagnostics (the underfit hypothesis's definitive answer):** eligible-eval fraction
+**0.2467** (3M: 0.1533; anchor: 0.386) — doubling steps recovered ~HALF the eligibility gap;
+train−val− 31.8% (was 41.6%); late-peaking 27% (was 18%); horizon_close 22.5% + manual_close
+33.0% (time-based exits now 55.5% of 16,657 trades — the agent increasingly manages exits
+itself), k-mix drifted longer (24: 37%, 8: 33%), flip 14.0%, TP 6.8%.
+
+**Pre-recorded interpretation APPLIES (with the measured nuance):** fit was **partially**
+restored (0.153→0.247, halfway to anchor) and the money did not follow — median −0.606→−0.5011,
+every seed's return negative, PF ≤ 1.001, consistency far from the bar. **"Fit restored,
+transfer still absent — entry selectivity unlearnable from this reward signal."** The 3M→6M
+dose-response is now measured: 2× optimization budget bought +0.10 median and flipped the paired
+delta positive, on a trajectory that is monotone but an order of magnitude too shallow — the gap
+to the BRACKET-EXPRESSIBLE supervised ceiling (V3 +1.69) is ~2.2 metric units; to V1, ~4.8.
+
+**What CLOSED means (per the Task-25/26 pins):** no further end-to-end PPO A/Bs on this
+observation/reward architecture — not more steps, not more heads, not more data windows. The
+architecture negative is now established by 5 A/Bs + a dose-response: reward/cost shaping
+exhausted (#1–#3), data quantity helps the features but not PPO (#4 vs Task-23), exit
+learnability solved WITHOUT moving money (#5: the agent plays the exit game), optimization
+budget half-restores fit without restoring transfer (#5b). **Future RL = hybrid
+(supervised-signal-in-obs) research item ONLY, requiring its own proposal.**
+
+**Phase-C surviving lines:** (1) supervised V1·10y benchmark stands (+4.26/+126%, E4 +80%) —
+hardening line STOPPED per enh/11 §3 (all cells fail the PF floor); any new supervised lever
+(E3 short-side/regime, 15y window) needs a fresh pinned proposal. (2) doc-02 pooling per enh/07
+with the ratified pooled-probe Phase-0 gate — blocked on XAGUSD acquisition; the enh/07 stopping
+rule remains the project's endgame if that line also fails.
+
+### Decision-log row
+| change | seeds | Δmedian | Wilcoxon | decision | notes |
+|---|---|---|---|---|---|
+| A/B #5b: #5 config, steps 3M→6M (tiebreaker) | 42,43,44 | +0.3166 | p=0.123, paired med +0.104 | **NO SHIP → TERMINAL RULE FIRED; end-to-end RL CLOSED** | eligible 0.153→0.247 (half-recovered), money still negative all seeds; pre-recorded "fit restored, transfer absent" interpretation applied; hybrid-RL = future research item only |
+
+---
+
+## Task 27 — THREE TRACKS + PROJECT ENDGAME — PINNED (pre-execution, 2026-07-08)
+
+**Reviewer direction (2026-07-08) after the Task-26 terminal state (RL closed, hardening
+stopped): Track A = final XAUUSD supervised lever family; Track B = silver replication (the
+ratified pooled-probe Phase-0 gate, reframed to replication-first); Track C = forward-shadow
+clock. STOP for review when A and B both land.**
+
+### PROJECT ENDGAME (recorded verbatim)
+**If Track A fails its terminal rule AND Track B fails replication, the project concludes at the
+honest terminus — benchmark documented, lockbox never opened.** Either success routes through a
+separately pinned enh/12-style validation battery BEFORE any lockbox discussion.
+
+### Track A pin — asymmetric/long-only lever family (full proposal: `enhancements/12-asymmetric-levers-proposal.md`)
+Exactly two cells vs V1·10y: **L1** shorts need train-q90 |score| (existing Task-22 constant;
+longs stay q80); **L2** long-only (zero constants). **Mandatory BETA control** = always-long in
+the identical trade grammar (every-bar long, k=4, same sizing/cost/folds/ruler) + unlevered gold
+B&H as context row. Success = full gate + viability ≥ +63.1% + E4 > 0 + beats-beta (return AND
+metric). **TERMINAL RULE: neither passes → XAUUSD-alone supervised line RESTS at benchmark; no
+L3, no tuning.** Ledger 12 → 14 cells. Pre-flight reproduces committed V1·10y before cells run.
+
+### Track B pin — XAGUSD replication (verdict rules pinned BEFORE any silver data is seen)
+- **Acquisition:** Dukascopy `dukascopy-node` per-year M1 chunks (same vendor/pipeline as the
+  gold backbone, commit 80ed738): bid 2003→2026, ask 2023→2026 (ask only for spread census);
+  `convert_dukascopy_to_lean.py` generalized with a `--symbol` arg (no behavior change for gold).
+  Density census per the 0b methodology; the sliding-fold grid comes from silver's OWN frame via
+  the frozen `make_sliding_folds` params (expect ~25 folds if dense from 2006; eras = fold
+  quartiles by the same Task-22 rule regardless of count).
+- **Cost methodology (mirrors gold verbatim):** silver `spread_atr_frac` = median(ask−bid) /
+  median(H1 ATR14) over 2023-01→data-end; `slippage_atr_frac` = 0.0030 reused (no independent
+  silver slippage measurement exists — pinned as methodology reuse); RT bar = spread + 2×slip.
+- **(i) Frozen Task-22 probe on silver alone:** same 25 features, same labels (k∈{2,4,8};
+  canonical + modal brackets, H=24), same models/hyperparams, same shuffle controls, same
+  verdict-config list. **REPLICATION VERDICT (pre-committed): the signal family REPLICATES iff
+  a verdict config's era-median top-quintile capture clears SILVER'S OWN cost bar in ≥2 of 4
+  eras** (same harness-integrity gate: shuffle medians within IC ±0.02 / AUC 0.48–0.52 first).
+- **(ii) Frozen V1 rule through the honest ruler on silver:** fwd4·ridge q80, k=4, 5y and 10y
+  arms, 6mo-refit grid, silver cost bar, full gate + E4-analog subset (last fold quartile) —
+  REPORTED with the same table format; no pass/fail beyond the replication verdict is pinned.
+- **QUARANTINE: no XAUUSD cell, constant, or interpretation may change based on anything seen in
+  Track B.**
+
+### Track C pin — forward-shadow clock (paper only; no broker, no execution)
+- **Freeze:** ridge refit on the 10y window ending at the LAST PRE-LOCKBOX bar (train =
+  2014-07-01→2024-06-30; fwd4 labels; q80 |train-pred| threshold). Chosen deliberately over "the
+  refit you'd run today": a trailing-10y-to-present fit would TRAIN on lockbox-era bars — the
+  seal stays intact (no lockbox bar is used for fitting OR evaluation). Consequence pinned: the
+  6mo refit cadence is SUSPENDED for the shadow (any future refit would consume lockbox bars and
+  needs its own pin). Frozen artifacts (coefficients, scaler, threshold, window hash):
+  `enhancements/12_shadow/frozen_model.json`.
+- **Shadow script** (`enhancements/12_shadow/shadow_signal.py`): pulls the latest ~30 days of
+  XAUUSD M1 from Dukascopy (public data; forward bars ≥ today are virgin, NOT lockbox
+  evaluation), rebuilds the 25 features, scores the last COMPLETED H1 bar with the frozen model,
+  appends `(utc_time, close, atr, score, side, threshold_pass, model_hash)` to the append-only
+  `shadow_log.csv`. Cadence: weekly (manual or user-scheduled); first entry logged at setup.
+  Explicitly out of scope: brokers, order routing, any execution simulation.
+
+**Execution order this task: pin (this entry + enh/12 proposal committed) → launch silver
+download (background) → Track A cells → Track C freeze + first log → Track B census/cost/probe/
+ruler when data lands → STOP with joint summary.**
+
+### Task 27 — Track A RESULTS: L1/L2 both FAIL → TERMINAL RULE FIRED; XAUUSD-alone supervised line RESTS at benchmark  ✅ (2026-07-08)
+
+Pre-flight exact; BETA control = −92.8% (grammar cost drag; gold B&H context +53.3%/+4.8% E4).
+**L1** (shorts q90): +91.1%, floor 0.84, breadth DROPPED 10/15 → FAIL (dominated by L2).
+**L2** (long-only): **metric +6.2523 (best ever), PF 1.157, +89.7%, E4 +50.5%, beats-beta ✓,
+floor 0.88 < 0.90 → FAIL on the floor alone.** The diagnosed short-bleed folds flipped positive
+(f15 +1.2/PF 1.047, f24 +2.4/1.086); the residual floor drivers are the weak-signal E3 chop folds
+f16 (.850)/f18 (.842) — confirming enh/11 Q3 (signal weakens, not a side/tail/leverage problem).
+**Per the pre-commit: no L3, no tuning — the line RESTS.** Ledger closed at 14 cells. Endgame leg
+1 of 2 is now set: Track A failed its terminal rule; the project terminus decision rides on
+Track B replication.
+
+### Task 27 — Track C DELIVERED: forward-shadow clock started  ✅ (2026-07-08)
+
+Frozen model: ridge/fwd4/q80 on the pre-lockbox 10y window **2014-07-01→2024-06-30** (59,027
+train rows; thr_q80 0.091917; **hash `5e8545ba814671cb`**) — deliberately NOT trailing-to-present
+(would train on lockbox bars; refit cadence SUSPENDED per pin). Scripts:
+`enhancements/12_shadow/freeze_model.py` + `shadow_signal.py` (fresh 35-day Dukascopy pull with
+backbone-tail fallback recorded in `data_source`; append-only; duplicate-bar idempotent; paper
+only — no broker, no execution). **First entry logged:** bar 2026-07-02 04:00 UTC, close 4069.76,
+score +0.0330 vs thr 0.0919 → side 0 (no signal), source backbone_file_tail. Cadence: weekly
+(`.venv/bin/python enhancements/12_shadow/shadow_signal.py`), user-schedulable.

@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parent
 
 
 def convert(price: str = "bid", raw_dir: Path = ROOT / "data" / "dukascopy_raw",
-            out_dir: Path = ROOT / "data") -> Path:
-    chunks = sorted(raw_dir.glob(f"xauusd-m1-{price}-*.csv"))
+            out_dir: Path = ROOT / "data", symbol: str = "xauusd") -> Path:
+    chunks = sorted(raw_dir.glob(f"{symbol}-m1-{price}-*.csv"))
     if not chunks:
-        raise FileNotFoundError(f"no xauusd-m1-{price}-*.csv chunks in {raw_dir}")
+        raise FileNotFoundError(f"no {symbol}-m1-{price}-*.csv chunks in {raw_dir}")
 
     frames = []
     for c in chunks:
@@ -53,7 +53,7 @@ def convert(price: str = "bid", raw_dir: Path = ROOT / "data" / "dukascopy_raw",
 
     start = raw["DateTime"].iloc[0].strftime("%Y.%m.%d")
     end = raw["DateTime"].iloc[-1].strftime("%Y.%m.%d")
-    out_path = out_dir / f"XAUUSD_M1_{price.capitalize()}_Dukascopy_{start}_{end}.csv"
+    out_path = out_dir / f"{symbol.upper()}_M1_{price.capitalize()}_Dukascopy_{start}_{end}.csv"
     out.to_csv(out_path, index=False)
 
     print(f"chunks    : {len(chunks)}  ({chunks[0].name} … {chunks[-1].name})")
@@ -67,5 +67,8 @@ def convert(price: str = "bid", raw_dir: Path = ROOT / "data" / "dukascopy_raw",
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--price", default="bid", choices=["bid", "ask"])
+    ap.add_argument("--symbol", default="xauusd",
+                    help="instrument prefix of the raw chunks (default xauusd; "
+                         "Task-27 Track B uses xagusd)")
     args = ap.parse_args()
-    convert(price=args.price)
+    convert(price=args.price, symbol=args.symbol)

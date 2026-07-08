@@ -27,6 +27,10 @@ class Position:
     sl_atr_mult: float = 0.0   # planned SL ATR multiplier (bracket choice)
     entry_atr: float = 0.0     # ATR at entry — prices BOTH cost legs (ATR-relative cost)
     bars_in_trade: int = 0
+    # Hold-horizon commitment (Phase-C A/B #5): max decision bars this position
+    # may live; the env auto-flattens at the k-th bar's close. 0 = no horizon
+    # (anchor behavior — the hold_horizon_bars menu is empty).
+    hold_bars: int = 0
 
 
 class BracketTradingEnv(gym.Env):
@@ -61,6 +65,22 @@ class BracketTradingEnv(gym.Env):
         commission_per_trade: float = 0.0,
         holding_penalty: float = 0.00002,
         reward_mtm_weight: float = 0.01,
+        # Turnover penalty (Phase-C A/B #1): R-units subtracted from REWARD ONLY on
+        # each NEW position open. 0.0 = off = anchor. Never touches equity/PnL/metric.
+        turnover_penalty_r: float = 0.0,
+        # Flip-aware turnover (Phase-C A/B #3): fraction of turnover_penalty_r charged
+        # to a FRESH entry (flips always pay full). 1.0 = A/B #1 flat; 0.0 = tax flips only.
+        turnover_entry_frac: float = 1.0,
+        # Cost-domain randomization (Phase-C A/B #2): per-episode TRAIN-time cost
+        # multiplier m ~ U[1-cost_rand_frac, 1+cost_rand_frac]. 0.0 = off = anchor
+        # (no RNG draw). Eval/test build this env with 0.0 so the metric is pinned.
+        cost_rand_frac: float = 0.0,
+        # Hold-horizon commitment (Phase-C A/B #5): when non-empty, the action
+        # gains a 4th head choosing k from this menu at entry; the env
+        # auto-flattens the position at k bars (exit_reason "horizon_close");
+        # brackets keep intrabar priority. () = off = anchor (action space,
+        # observation, and step path byte-identical to the anchor).
+        hold_horizon_bars: Tuple[int, ...] = (),
         max_episode_steps: Optional[int] = None,
         randomize_start: bool = False,
     ):
@@ -77,6 +97,40 @@ class BracketTradingEnv(gym.Env):
         self.commission_per_trade = float(commission_per_trade)
         self.holding_penalty = float(holding_penalty)
         self.reward_mtm_weight = float(reward_mtm_weight)
+        # Validate the turnover penalty at construction (it is env-var-driven, so
+        # a bad value can slip in at launch). A NEGATIVE value would flip the sign
+        # of `reward -= turnover_penalty_r` into a churn REWARD — a silent
+        # inversion of the mechanism — and a NaN/inf would poison the reward and
+        # the policy gradient. Fail loudly rather than train a corrupted run.
+        _tp = float(turnover_penalty_r)
+        if not np.isfinite(_tp) or _tp < 0.0:
+            raise ValueError(
+                f"turnover_penalty_r must be a finite, non-negative float (R-units); "
+                f"got {turnover_penalty_r!r}")
+        self.turnover_penalty_r = _tp
+        # Flip-aware fresh-entry weight (A/B #3): finite, non-negative (typically [0,1]).
+        _tef = float(turnover_entry_frac)
+        if not np.isfinite(_tef) or _tef < 0.0:
+            raise ValueError(
+                f"turnover_entry_frac must be a finite, non-negative float; got {turnover_entry_frac!r}")
+        self.turnover_entry_frac = _tef
+        # Cost-domain randomization (A/B #2): validate in [0,1) — >=1 would allow a
+        # zero/negative cost draw. The per-episode multiplier lives in _cost_mult
+        # (1.0 until reset() draws one, and only when cost_rand_frac>0).
+        _cr = float(cost_rand_frac)
+        if not np.isfinite(_cr) or not (0.0 <= _cr < 1.0):
+            raise ValueError(
+                f"cost_rand_frac must be a finite float in [0.0, 1.0); got {cost_rand_frac!r}")
+        self.cost_rand_frac = _cr
+        self._cost_mult = 1.0
+        # Hold-horizon menu (A/B #5): validate like the other env-var-driven
+        # knobs — a malformed value must fail loudly at construction.
+        _hh = tuple(int(k) for k in hold_horizon_bars)
+        if any((k <= 0 or k > 1000) for k in _hh):
+            raise ValueError(
+                f"hold_horizon_bars must be positive ints <= 1000 (decision bars); "
+                f"got {hold_horizon_bars!r}")
+        self.hold_horizon_bars = _hh
         self.max_episode_steps = max_episode_steps or (len(self.decision_df) - 2)
 
         self.randomize_start = randomize_start
@@ -92,10 +146,15 @@ class BracketTradingEnv(gym.Env):
         self._m1_low   = self.m1_df["Low"].to_numpy(dtype=np.float64)
         self._m1_index = self.m1_df.index  # DatetimeIndex (sorted, tz-aware)
 
-        self.action_space = spaces.MultiDiscrete([3, len(self.sl_atr_multipliers), len(self.tp_r_multipliers)])
+        _action_dims = [3, len(self.sl_atr_multipliers), len(self.tp_r_multipliers)]
+        if self.hold_horizon_bars:
+            _action_dims.append(len(self.hold_horizon_bars))   # A/B #5: exit-timing head
+        self.action_space = spaces.MultiDiscrete(_action_dims)
 
-        # Market features + position state.
-        self.n_pos_features = 6
+        # Market features + position state (+1 remaining-hold fraction when the
+        # hold-horizon head is enabled — the sampled commitment must be
+        # observable for the exit game to be learnable by a memoryless policy).
+        self.n_pos_features = 7 if self.hold_horizon_bars else 6
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -114,6 +173,15 @@ class BracketTradingEnv(gym.Env):
             self.i = int(self.np_random.integers(0, max_start))
         else:
             self.i = 0
+        # Cost-domain randomization (A/B #2): draw a per-episode cost multiplier
+        # ONLY when enabled. At cost_rand_frac == 0 no RNG is consumed here, so
+        # training is bit-identical to the anchor. U[1-f, 1+f] has mean 1.0, so the
+        # measured cost level is held — only its dispersion is learned against.
+        if self.cost_rand_frac > 0.0:
+            self._cost_mult = float(self.np_random.uniform(1.0 - self.cost_rand_frac,
+                                                           1.0 + self.cost_rand_frac))
+        else:
+            self._cost_mult = 1.0
         self.steps = 0
         self.equity = self.initial_equity
         self.realized_pnl = 0.0
@@ -138,20 +206,26 @@ class BracketTradingEnv(gym.Env):
         atr = max(float(row["atr"]), 1e-12)
         p = self.position
         if p.direction == 0:
-            return np.array([0, 0, 0, 0, 0, 0], dtype=np.float32)
+            return np.zeros(self.n_pos_features, dtype=np.float32)
 
         unrealized = (close - p.entry_price) * p.units * p.direction
         unrealized_r = unrealized / max(p.risk_cash, 1e-12)
         dist_tp_atr = ((p.tp - close) * p.direction) / atr
         dist_sl_atr = ((close - p.sl) * p.direction) / atr
-        return np.array([
+        feats = [
             p.direction,
             unrealized_r,
             min(p.bars_in_trade / 100.0, 10.0),
             dist_tp_atr,
             dist_sl_atr,
             p.tp_r,
-        ], dtype=np.float32)
+        ]
+        if self.hold_horizon_bars:
+            # Remaining-hold fraction of the entry-time commitment (A/B #5):
+            # 1.0 just after entry -> 0.0 at the auto-flatten bar.
+            feats.append(max(p.hold_bars - p.bars_in_trade, 0) / p.hold_bars
+                         if p.hold_bars > 0 else 0.0)
+        return np.array(feats, dtype=np.float32)
 
     def _observation(self):
         row = self._current_row()
@@ -162,9 +236,11 @@ class BracketTradingEnv(gym.Env):
         return obs
 
     def _half_cost(self, atr: float) -> float:
-        """Per-side execution cost in price units at a given ATR:
-        half-spread + slippage, both as fractions of ATR."""
-        return (self.spread_atr_frac / 2.0 + self.slippage_atr_frac) * atr
+        """Per-side execution cost in price units at a given ATR: half-spread +
+        slippage, both as fractions of ATR, scaled by the per-episode cost-domain
+        multiplier (A/B #2). _cost_mult == 1.0 unless training-time randomization is
+        enabled, so eval/test cost is exactly the pinned value (× 1.0 is exact)."""
+        return (self.spread_atr_frac / 2.0 + self.slippage_atr_frac) * atr * self._cost_mult
 
     def _entry_price(self, close: float, direction: int, atr: float) -> float:
         return close + direction * self._half_cost(atr)
@@ -175,7 +251,8 @@ class BracketTradingEnv(gym.Env):
         # so the M1 fill loop needs no bar-level ATR plumbing.
         return price - direction * self._half_cost(entry_atr)
 
-    def _open_position(self, direction: int, sl_idx: int, tp_idx: int):
+    def _open_position(self, direction: int, sl_idx: int, tp_idx: int,
+                       hold_idx: Optional[int] = None):
         row = self._current_row()
         close = float(row["Close"])
         atr = max(float(row["atr"]), 1e-12)
@@ -201,6 +278,8 @@ class BracketTradingEnv(gym.Env):
             sl_atr_mult=sl_atr_mult,
             entry_atr=atr,
             bars_in_trade=0,
+            hold_bars=(self.hold_horizon_bars[hold_idx]
+                       if self.hold_horizon_bars and hold_idx is not None else 0),
         )
 
     def _close_position(self, exit_price_raw: float, exit_time: pd.Timestamp, reason: str) -> float:
@@ -229,6 +308,7 @@ class BracketTradingEnv(gym.Env):
             "r_mult": r_mult,                # realized R-multiple (actual outcome)
             "bars_in_trade": p.bars_in_trade,
             "exit_reason": reason,
+            "hold_bars": p.hold_bars,        # A/B #5 chosen-k diagnostic (0 = no horizon)
         })
         self.position = Position()
         return pnl
@@ -286,6 +366,9 @@ class BracketTradingEnv(gym.Env):
     def step(self, action):
         action = np.asarray(action, dtype=int)
         direction_raw, sl_idx, tp_idx = int(action[0]), int(action[1]), int(action[2])
+        # A/B #5: 4th action component = hold-horizon menu index (entry-time only;
+        # ignored unless a NEW position opens this step).
+        hold_idx = int(action[3]) if self.hold_horizon_bars else None
         desired_direction = {0: 0, 1: 1, 2: -1}[direction_raw]
 
         prev_equity = self.equity
@@ -293,18 +376,35 @@ class BracketTradingEnv(gym.Env):
         row = self._current_row()
         close = float(row["Close"])
 
+        # A/B #5 hold-horizon commitment: enforce the entry-time flatten BEFORE
+        # this bar's action is applied. Brackets kept full intrabar priority via
+        # the M1 fill loop through the k-th bar's interior (previous steps); the
+        # flatten prices at this bar's close with manual-close economics. The
+        # action below may re-enter at this same close (a fresh entry, fresh
+        # costs). Dead branch when the menu is empty (anchor).
+        if (self.hold_horizon_bars and self.position.direction != 0
+                and self.position.hold_bars > 0
+                and self.position.bars_in_trade >= self.position.hold_bars):
+            self._close_position(close, self._current_time(), "horizon_close")
+
         # Handle explicit close or flip at current decision close.
+        # Per-open turnover-penalty weight (A/B #3 flip-aware): 0.0 = no open this step;
+        # 1.0 = a FLIP/reversal (low conviction — full penalty); turnover_entry_frac
+        # = a FRESH entry (higher conviction — reduced/zero penalty).
+        open_pen_weight = 0.0
         if self.position.direction != 0:
             current_dir = self.position.direction
             if desired_direction == 0:
                 self._close_position(close, self._current_time(), "manual_close")
             elif desired_direction != current_dir:
                 self._close_position(close, self._current_time(), "flip_close")
-                self._open_position(desired_direction, sl_idx, tp_idx)
+                self._open_position(desired_direction, sl_idx, tp_idx, hold_idx)
+                open_pen_weight = 1.0                        # FLIP — full penalty
 
         # Fresh entry if flat and action wants exposure.
         if self.position.direction == 0 and desired_direction != 0:
-            self._open_position(desired_direction, sl_idx, tp_idx)
+            self._open_position(desired_direction, sl_idx, tp_idx, hold_idx)
+            open_pen_weight = self.turnover_entry_frac       # FRESH — reduced (A/B #3)
 
         # Simulate TP/SL using the M1 candles inside this decision interval.
         self._simulate_m1_until_next_decision()
@@ -325,6 +425,13 @@ class BracketTradingEnv(gym.Env):
         if self.position.direction != 0:
             reward += (unrealized / max(self.position.risk_cash, 1e-12)) * self.reward_mtm_weight
             reward -= self.holding_penalty
+        # Turnover penalty (Phase-C A/B #1 flat / #3 flip-aware): REWARD-ONLY term,
+        # charged once per NEW position. A flip pays turnover_penalty_r; a fresh entry
+        # pays turnover_penalty_r * turnover_entry_frac (entry_frac=1.0 -> A/B #1 flat;
+        # 0.0 -> tax flips only). Guarded so turnover_penalty_r==0 OR weight==0 is a
+        # strict no-op — NEVER touches equity, PnL, fills, the trade log, or the metric.
+        if self.turnover_penalty_r and open_pen_weight:
+            reward -= self.turnover_penalty_r * open_pen_weight
 
         self.history.append({
             "time": self._current_time(),

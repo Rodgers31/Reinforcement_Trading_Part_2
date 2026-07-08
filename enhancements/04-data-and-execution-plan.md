@@ -118,6 +118,19 @@ measures the ruler changing, not the strategy.
   Phase-C A/B (calibrating to noise, not outcome). Implemented: `sharpe_trade`,
   `max_drawdown_mtm_pct`, `ulcer_index_mtm` in `evaluate.py`; harness in
   `eval_harness.py`.
+- **SHIP RULE RECALIBRATED → RATIFIED (2026-07-03, final — spends the reserved
+  one-time recalibration).** The provisional "≥ +10% relative" margin (≈ 0.053 ≈
+  seed-IQR/8, inside noise) is REPLACED by an absolute margin sized to the
+  baseline's measured seed-IQR (0.4188). Ship a candidate over the running-best
+  iff ALL FOUR legs pass — (a) Δmedian ≥ **0.21 ABSOLUTE** (= 0.5 × 0.4188, pinned
+  as a NUMBER, not recomputed per run); (b) paired per-(fold,seed) **Wilcoxon
+  signed-rank p < 0.01** with positive median delta; (c) **≥ 4/5 seeds** beat the
+  running-best median; (d) **no gate regression** (no gate leg flips OK→FAIL vs
+  the anchor). 3 seeds rank → the 5-seed finalist applies the full rule. Wired
+  into the A/B report tooling `ab_report.py` (`SHIP_DELTA_MEDIAN_ABS=0.21`,
+  `SHIP_WILCOXON_P=0.01`, `SHIP_MIN_SEEDS_BEAT=4`). This is the ONE recalibration
+  reserved 2026-07-01; it is now **spent** and the rule is frozen for Phase C
+  (re-pin only for mechanical mis-specification, never to make a result pass).
 - **PINNED gate re-form (doc 05 N3, RATIFIED 2026-07-01).** Fraction/quantile
   form, fold-count-invariant: breadth `min_consistent_fold_frac = 0.70`
   (return>0 AND PF>1; ceil(0.70×5)=4 reproduces the old block-scheme 4-of-5),

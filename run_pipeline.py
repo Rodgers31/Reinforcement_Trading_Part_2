@@ -54,6 +54,7 @@ def _make_env(decision_df, m1_df, feature_cols):
         commission_per_trade=CFG.commission_per_trade,
         holding_penalty=CFG.holding_penalty,
         reward_mtm_weight=CFG.reward_mtm_weight,
+        turnover_penalty_r=CFG.turnover_penalty_r,
     )
 
 

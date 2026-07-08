@@ -1,0 +1,306 @@
+{
+  "anchor": {
+    "full25": {
+      "per_seed": {
+        "42": -0.5282,
+        "43": -0.616,
+        "44": -0.1094,
+        "45": -0.526,
+        "46": 0.0095
+      },
+      "median": -0.5260091750767695
+    },
+    "f11_25": {
+      "per_seed": {
+        "42": -0.9035,
+        "43": -0.8177,
+        "44": -0.4209,
+        "45": -0.78,
+        "46": -0.7162
+      },
+      "median": -0.7800302450592533
+    },
+    "f19_25": {
+      "per_seed": {
+        "42": -0.7657,
+        "43": -0.6606,
+        "44": 0.2063,
+        "45": 0.3078,
+        "46": -0.7388
+      },
+      "median": -0.6605816775016855
+    }
+  },
+  "pinned": {
+    "rt_cost_atr_frac": 0.0683,
+    "commission": 0.01,
+    "risk_frac": 0.005,
+    "k": 4,
+    "H": 24,
+    "bracket": [
+      1.0,
+      1.0
+    ],
+    "q": 0.8
+  },
+  "results": {
+    "V1_5y": {
+      "metric_stitched": -0.015890661592072856,
+      "stitched_return_pct": -0.8199864837461379,
+      "stitched_max_dd_mtm_pct": -51.60178378949261,
+      "stitched_pf": 1.008796857112722,
+      "stitched_sharpe_trade": 0.083444809733179,
+      "n_trades": 6163.0,
+      "win_rate_pct": 49.213045594677915,
+      "avg_bars_in_trade": 3.9946454648710046,
+      "gate_passed": false,
+      "gate_detail": [
+        "[FAIL] folds with return>0 & PF>1: 14/25  (need >= 18 = ceil(70% of 25))",
+        "[FAIL] 10%-quantile fold PF: 0.79  (need >= 0.9)",
+        "[OK  ] mean trade-Sharpe: +0.06  (need > 0)"
+      ],
+      "folds_positive": 14,
+      "n_folds": 25,
+      "era_fold_metric_median": {
+        "1": 0.4697526175089669,
+        "2": -0.004518349046171932,
+        "3": 0.25576520254000285,
+        "4": -0.08234466942931243
+      },
+      "era_return_median": {
+        "1": 5.424316227161164,
+        "2": -0.8256494011135094,
+        "3": 2.3639280500501236,
+        "4": -1.3148198031533553
+      },
+      "E4_metric_stitched": -0.2571262259100338,
+      "E4_return_pct": -8.588177611827135,
+      "exit_reason_mix": {
+        "time": 6151,
+        "eow": 12
+      },
+      "gross_pnl_mid_total": 22561.82910984348,
+      "cost_paid_total": 21153.523019289518,
+      "cost_over_gross_pct": 93.75801454883137,
+      "diag": {
+        "selected_bar_frac": 0.2026,
+        "skipped_in_pos_total": 7890,
+        "ambiguous_both_touch_total": 0
+      }
+    },
+    "V2_5y": {
+      "metric_stitched": -0.9675637935623839,
+      "stitched_return_pct": -85.30603288478125,
+      "stitched_max_dd_mtm_pct": -88.16579687288714,
+      "stitched_pf": 0.8952977528756617,
+      "stitched_sharpe_trade": -1.2967004263835933,
+      "n_trades": 6702.0,
+      "win_rate_pct": 48.716800954938826,
+      "avg_bars_in_trade": 3.8421366756192183,
+      "gate_passed": false,
+      "gate_detail": [
+        "[FAIL] folds with return>0 & PF>1: 3/25  (need >= 18 = ceil(70% of 25))",
+        "[FAIL] 10%-quantile fold PF: 0.76  (need >= 0.9)",
+        "[FAIL] mean trade-Sharpe: -1.30  (need > 0)"
+      ],
+      "folds_positive": 3,
+      "n_folds": 25,
+      "era_fold_metric_median": {
+        "1": -0.6915375155509624,
+        "2": -0.452984627735433,
+        "3": -0.448097616666612,
+        "4": -0.674208922630955
+      },
+      "era_return_median": {
+        "1": -9.650582437583543,
+        "2": -6.686218478036299,
+        "3": -6.185951190159655,
+        "4": -8.16660217650953
+      },
+      "E4_metric_stitched": -0.8539156714939631,
+      "E4_return_pct": -44.971344354304655,
+      "exit_reason_mix": {
+        "SL": 3404,
+        "TP": 3226,
+        "TP_gap": 36,
+        "SL_gap": 16,
+        "eow": 11,
+        "timeout": 9
+      },
+      "gross_pnl_mid_total": 4130.396587574325,
+      "cost_paid_total": 21970.57756941679,
+      "cost_over_gross_pct": 531.9241652366254,
+      "diag": {
+        "selected_bar_frac": 0.2026,
+        "skipped_in_pos_total": 7351,
+        "ambiguous_both_touch_total": 117
+      }
+    },
+    "V1_10y": {
+      "metric_stitched": 4.262554446133945,
+      "stitched_return_pct": 126.20171594957287,
+      "stitched_max_dd_mtm_pct": -29.60706251248836,
+      "stitched_pf": 1.113109541945004,
+      "stitched_sharpe_trade": 0.8110740212000216,
+      "n_trades": 3483.0,
+      "win_rate_pct": 49.727246626471434,
+      "avg_bars_in_trade": 3.9939707149009473,
+      "gate_passed": false,
+      "gate_detail": [
+        "[OK  ] folds with return>0 & PF>1: 11/15  (need >= 11 = ceil(70% of 15))",
+        "[FAIL] 10%-quantile fold PF: 0.82  (need >= 0.9)",
+        "[OK  ] mean trade-Sharpe: +0.75  (need > 0)"
+      ],
+      "folds_positive": 11,
+      "n_folds": 15,
+      "era_fold_metric_median": {
+        "2": 1.8643685568376498,
+        "3": -0.11615299930921766,
+        "4": 0.6035240526723123
+      },
+      "era_return_median": {
+        "2": 13.592152936582869,
+        "3": 0.18174392574733522,
+        "4": 6.355584448490981
+      },
+      "E4_metric_stitched": 5.4267934375031235,
+      "E4_return_pct": 80.31049415809,
+      "exit_reason_mix": {
+        "time": 3475,
+        "eow": 8
+      },
+      "gross_pnl_mid_total": 21591.161769983315,
+      "cost_paid_total": 12071.122865232748,
+      "cost_over_gross_pct": 55.9077042441245,
+      "diag": {
+        "selected_bar_frac": 0.1912,
+        "skipped_in_pos_total": 4397,
+        "ambiguous_both_touch_total": 0
+      }
+    },
+    "V2_10y": {
+      "metric_stitched": -0.7246849093599125,
+      "stitched_return_pct": -43.107322295193825,
+      "stitched_max_dd_mtm_pct": -59.48422788777117,
+      "stitched_pf": 0.952029780263278,
+      "stitched_sharpe_trade": -0.621222255930082,
+      "n_trades": 3852.0,
+      "win_rate_pct": 50.10384215991692,
+      "avg_bars_in_trade": 3.933281412253375,
+      "gate_passed": false,
+      "gate_detail": [
+        "[FAIL] folds with return>0 & PF>1: 5/15  (need >= 11 = ceil(70% of 15))",
+        "[FAIL] 10%-quantile fold PF: 0.80  (need >= 0.9)",
+        "[FAIL] mean trade-Sharpe: -0.65  (need > 0)"
+      ],
+      "folds_positive": 5,
+      "n_folds": 15,
+      "era_fold_metric_median": {
+        "2": 0.013509958089215235,
+        "3": -0.5146617504720583,
+        "4": -0.32889392826131997
+      },
+      "era_return_median": {
+        "2": -4.2752591434084275,
+        "3": -5.940058160905398,
+        "4": -3.0262163596433855
+      },
+      "E4_metric_stitched": -0.48177128411724446,
+      "E4_return_pct": -17.575961645205084,
+      "exit_reason_mix": {
+        "SL": 1896,
+        "TP": 1894,
+        "TP_gap": 33,
+        "SL_gap": 16,
+        "eow": 8,
+        "timeout": 5
+      },
+      "gross_pnl_mid_total": 8193.819109169544,
+      "cost_paid_total": 12831.71181607354,
+      "cost_over_gross_pct": 156.602332137328,
+      "diag": {
+        "selected_bar_frac": 0.1912,
+        "skipped_in_pos_total": 4028,
+        "ambiguous_both_touch_total": 53
+      }
+    },
+    "V1_5y_f11_25": {
+      "metric_stitched": 0.027709973711181012,
+      "stitched_return_pct": 1.257729142684405,
+      "stitched_max_dd_mtm_pct": -45.38904135361592,
+      "stitched_pf": 1.0091403139365531,
+      "stitched_sharpe_trade": 0.09351349903072226,
+      "n_trades": 3571.0,
+      "win_rate_pct": 49.285914309717164,
+      "avg_bars_in_trade": 3.994119294315318,
+      "gate_passed": false,
+      "gate_detail": [
+        "[FAIL] folds with return>0 & PF>1: 9/15  (need >= 11 = ceil(70% of 15))",
+        "[FAIL] 10%-quantile fold PF: 0.79  (need >= 0.9)",
+        "[OK  ] mean trade-Sharpe: +0.09  (need > 0)"
+      ],
+      "folds_positive": 9,
+      "n_folds": 15,
+      "era_fold_metric_median": {
+        "2": 0.8795279272745777,
+        "3": 0.25576520254000285,
+        "4": -0.08234466942931243
+      },
+      "era_return_median": {
+        "2": 6.848933084743402,
+        "3": 2.3639280500501236,
+        "4": -1.3148198031533553
+      },
+      "E4_metric_stitched": -0.2571262259100338,
+      "E4_return_pct": -8.588177611827135,
+      "exit_reason_mix": {
+        "time": 3563,
+        "eow": 8
+      },
+      "gross_pnl_mid_total": 12907.28282532056,
+      "cost_paid_total": 12089.528545127372,
+      "cost_over_gross_pct": 93.66439636242433
+    },
+    "V2_5y_f11_25": {
+      "metric_stitched": -0.8874753918045414,
+      "stitched_return_pct": -61.209469350740406,
+      "stitched_max_dd_mtm_pct": -68.97032854768017,
+      "stitched_pf": 0.9110485787849407,
+      "stitched_sharpe_trade": -1.0754380154552965,
+      "n_trades": 3907.0,
+      "win_rate_pct": 49.168159713335044,
+      "avg_bars_in_trade": 3.8720245712823136,
+      "gate_passed": false,
+      "gate_detail": [
+        "[FAIL] folds with return>0 & PF>1: 2/15  (need >= 11 = ceil(70% of 15))",
+        "[FAIL] 10%-quantile fold PF: 0.79  (need >= 0.9)",
+        "[FAIL] mean trade-Sharpe: -1.07  (need > 0)"
+      ],
+      "folds_positive": 2,
+      "n_folds": 15,
+      "era_fold_metric_median": {
+        "2": 0.02772792962757159,
+        "3": -0.448097616666612,
+        "4": -0.674208922630955
+      },
+      "era_return_median": {
+        "2": -0.3866225122375053,
+        "3": -6.185951190159655,
+        "4": -8.16660217650953
+      },
+      "E4_metric_stitched": -0.8539156714939631,
+      "E4_return_pct": -44.971344354304655,
+      "exit_reason_mix": {
+        "SL": 1966,
+        "TP": 1889,
+        "TP_gap": 29,
+        "SL_gap": 12,
+        "eow": 7,
+        "timeout": 4
+      },
+      "gross_pnl_mid_total": 4043.6847371542435,
+      "cost_paid_total": 12852.161529384088,
+      "cost_over_gross_pct": 317.83292627379353
+    }
+  }
+}
