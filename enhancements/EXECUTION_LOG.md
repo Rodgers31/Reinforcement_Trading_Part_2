@@ -1858,3 +1858,14 @@ f16 (.850)/f18 (.842) — confirming enh/11 Q3 (signal weakens, not a side/tail/
 **Per the pre-commit: no L3, no tuning — the line RESTS.** Ledger closed at 14 cells. Endgame leg
 1 of 2 is now set: Track A failed its terminal rule; the project terminus decision rides on
 Track B replication.
+
+### Task 27 — Track C DELIVERED: forward-shadow clock started  ✅ (2026-07-08)
+
+Frozen model: ridge/fwd4/q80 on the pre-lockbox 10y window **2014-07-01→2024-06-30** (59,027
+train rows; thr_q80 0.091917; **hash `5e8545ba814671cb`**) — deliberately NOT trailing-to-present
+(would train on lockbox bars; refit cadence SUSPENDED per pin). Scripts:
+`enhancements/12_shadow/freeze_model.py` + `shadow_signal.py` (fresh 35-day Dukascopy pull with
+backbone-tail fallback recorded in `data_source`; append-only; duplicate-bar idempotent; paper
+only — no broker, no execution). **First entry logged:** bar 2026-07-02 04:00 UTC, close 4069.76,
+score +0.0330 vs thr 0.0919 → side 0 (no signal), source backbone_file_tail. Cadence: weekly
+(`.venv/bin/python enhancements/12_shadow/shadow_signal.py`), user-schedulable.
